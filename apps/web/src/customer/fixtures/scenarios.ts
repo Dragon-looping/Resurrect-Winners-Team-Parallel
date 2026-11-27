@@ -1,4 +1,4 @@
-import { CustomerOrder } from '../types/order.ts';
+import type { CustomerOrder } from '../types/order.ts';
 
 export const SEEDED_SCENARIOS: Record<string, CustomerOrder> = {
   // Scenario 1: Signature Split Offer (Warehouse count adjusted to 40, offer: 40 on Fri, 10 on Sun)

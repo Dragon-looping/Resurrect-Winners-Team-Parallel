@@ -6,6 +6,7 @@ import { SplitOfferCard } from '../components/SplitOfferCard.tsx';
 import { LaterOfferCard } from '../components/LaterOfferCard.tsx';
 import { RecoveryPendingCard } from '../components/RecoveryPendingCard.tsx';
 import { ConfirmedScheduleCard } from '../components/ConfirmedScheduleCard.tsx';
+import { ExpiredOfferCard } from '../components/ExpiredOfferCard.tsx';
 import { OrderStatusBadge, OrderSummarySideCard } from '../components/OrderStatusHeader.tsx';
 import { AlertIcon, ClockIcon, RefreshIcon } from '../../shared/icons.tsx';
 
@@ -61,7 +62,7 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
   };
 
   const handleOfferDecision = async (decision: CustomerDecision) => {
-    if (!order || !order.activeOffer) return;
+    if (!order || !order.activeOffer || isSubmitting) return; // Guard double clicks
     setIsSubmitting(true);
     setError(null);
     try {
@@ -73,7 +74,34 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
       });
       setOrder(updated);
     } catch (err: any) {
-      setError(err.message || 'Failed to submit offer response.');
+      // After an ambiguous failure or timeout, fetch authoritative state first before prompting retry
+      try {
+        const adapter = getOrderAdapter();
+        const authoritative = await adapter.getOrder(order.orderId);
+        if (authoritative.version > order.version) {
+          // Reply was actually accepted by backend before network interruption!
+          setOrder(authoritative);
+          return;
+        }
+      } catch {
+        // Authoritative fetch also failed
+      }
+      setError(err.message || 'Transmission failed. Checked authoritative state: reply was not recorded. You may safely retry.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRefreshOffer = async () => {
+    if (!order || isSubmitting) return;
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const adapter = getOrderAdapter();
+      const updated = await adapter.refreshOffer(order.orderId);
+      setOrder(updated);
+    } catch (err: any) {
+      setError(err.message || 'Failed to renew allocation schedule.');
     } finally {
       setIsSubmitting(false);
     }
@@ -251,6 +279,13 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
             order={order}
             offer={order.activeOffer}
             onDecision={handleOfferDecision}
+            isSubmitting={isSubmitting}
+          />
+        ) : order.status === 'expired' ? (
+          <ExpiredOfferCard
+            order={order}
+            offer={order.activeOffer}
+            onRefresh={handleRefreshOffer}
             isSubmitting={isSubmitting}
           />
         ) : order.status === 'confirmed' || order.status === 'unavoidable_delay' ? (

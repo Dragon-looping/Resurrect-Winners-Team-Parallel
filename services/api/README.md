@@ -162,3 +162,13 @@ Canonical demo plants (`Mangaluru`, `Udupi`, `Manipal`) and SKUs (`Electric fans
 - `POST /orders/{order_id}/offers` & `POST /offers/{offer_id}/reply` — Customer delivery offers and replies (CRD preserved).
 - `POST /orders/{order_id}/plans` & `POST /plans/{plan_id}/approve` — Deterministic plan preview and transactional approval.
 - `POST /production/batches`, `GET /production/batches`, `POST /production/batches/{batch_id}/complete` — Production batch readiness and idempotent output receipt.
+
+## Godown Recovery Endpoints
+
+- `POST /recovery/search` — Discover eligible surplus godowns and safe order-to-order swaps across Mangaluru, Udupi, and Manipal.
+- `POST /recovery/swaps/preview` — Generate an explainable recovery plan preview (`PREVIEW` status; never auto-executes).
+- `POST /recovery/swaps/{id}/approve` — Mandatory human approval with stock/order version revalidation and atomic execution.
+- `GET /recovery/{id}` — Inspect recovery plan details, economics, and rejection reasons.
+- `GET /recovery/{id}/alternatives` — View alternative godown options and recovery audit logs.
+
+Recovery demo routes are defined in `app/fulfilment/recovery/demo.py` (`seed_godown_recovery_demo`) and verified end-to-end in `tests/test_recovery_integration.py`.

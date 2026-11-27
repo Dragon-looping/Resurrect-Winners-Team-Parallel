@@ -61,29 +61,6 @@ def post_recovery_preview(
     return RecoveryPlanResponse.model_validate(plan)
 
 
-@router.get(
-    "/recovery/{recovery_id}/alternatives",
-    response_model=RecoveryAlternativesResponse,
-    summary="Get recovery alternatives and audit history",
-    description="Returns alternative godown options (feasible and rejected) and audit trail for a recovery plan.",
-)
-def get_recovery_alternatives_endpoint(
-    recovery_id: int,
-    db: Session = Depends(get_db),
-) -> RecoveryAlternativesResponse:
-    """Fetch alternative recovery options and audit trail for a plan."""
-    try:
-        plan, alternatives, logs = get_recovery_alternatives(db, recovery_id)
-    except OrderError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
-    return RecoveryAlternativesResponse(
-        recovery_id=plan.id,
-        target_order_id=plan.target_order_id,
-        alternatives=alternatives,
-        audit_logs=[RecoveryAuditLogResponse.model_validate(log) for log in logs],
-    )
-
-
 @router.post(
     "/recovery/swaps/{recovery_id}/approve",
     response_model=RecoveryPlanResponse,
@@ -143,69 +120,3 @@ def get_recovery_by_id(
     except OrderError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
     return RecoveryPlanResponse.model_validate(plan)
-
-
-@router.get(
-    "/recovery/{recovery_id}/alternatives",
-    response_model=RecoveryAlternativesResponse,
-    summary="Get recovery alternatives and audit history",
-    description="Returns alternative godown options (feasible and rejected) and audit trail for a recovery plan.",
-)
-def get_recovery_alternatives_endpoint(
-    recovery_id: int,
-    db: Session = Depends(get_db),
-) -> RecoveryAlternativesResponse:
-    """Fetch alternative recovery options and audit trail for a plan."""
-    try:
-        plan, alternatives, logs = get_recovery_alternatives(db, recovery_id)
-    except OrderError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
-    return RecoveryAlternativesResponse(
-        recovery_id=plan.id,
-        target_order_id=plan.target_order_id,
-        alternatives=alternatives,
-        audit_logs=[RecoveryAuditLogResponse.model_validate(log) for log in logs],
-    )
-
-
-@router.post(
-    "/recovery/swaps/{recovery_id}/approve",
-    response_model=RecoveryPlanResponse,
-    summary="Approve and execute a recovery plan",
-    description="Revalidates versions and feasibility, then atomically commits both orders' allocation changes.",
-)
-def post_recovery_approve(
-    recovery_id: int,
-    payload: RecoveryApproveRequest | None = None,
-    db: Session = Depends(get_db),
-) -> RecoveryPlanResponse:
-    """Approve and execute a recovery plan transactionally."""
-    actor = payload.actor if payload is not None else "operator"
-    try:
-        plan = approve_recovery_plan(db, recovery_id, actor=actor)
-    except OrderError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
-    return RecoveryPlanResponse.model_validate(plan)
-
-
-@router.get(
-    "/recovery/{recovery_id}/alternatives",
-    response_model=RecoveryAlternativesResponse,
-    summary="Get recovery alternatives and audit history",
-    description="Returns alternative godown options (feasible and rejected) and audit trail for a recovery plan.",
-)
-def get_recovery_alternatives_endpoint(
-    recovery_id: int,
-    db: Session = Depends(get_db),
-) -> RecoveryAlternativesResponse:
-    """Fetch alternative recovery options and audit trail for a plan."""
-    try:
-        plan, alternatives, logs = get_recovery_alternatives(db, recovery_id)
-    except OrderError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
-    return RecoveryAlternativesResponse(
-        recovery_id=plan.id,
-        target_order_id=plan.target_order_id,
-        alternatives=alternatives,
-        audit_logs=[RecoveryAuditLogResponse.model_validate(log) for log in logs],
-    )

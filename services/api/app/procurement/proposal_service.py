@@ -193,7 +193,7 @@ async def generate_purchase_proposal(
             "resolution_type": hit.case.resolution_type,
             "outcome_summary": hit.case.outcome_summary,
         }
-        for hit in case_search.hits
+        for hit in case_search.results
     ]
 
     evidence_items: list[EvidenceItem] = [

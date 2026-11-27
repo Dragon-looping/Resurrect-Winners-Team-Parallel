@@ -8,6 +8,7 @@ from app.routes.offers import router as offers_router
 from app.routes.orders import router as orders_router
 from app.routes.plans import router as plans_router
 from app.routes.production import router as production_router
+from app.routes.recovery import router as recovery_router
 from app.routes.stock import router as stock_router
 from app.routes.stream import router as stream_router
 
@@ -20,6 +21,7 @@ __all__ = [
     "orders_router",
     "plans_router",
     "production_router",
+    "recovery_router",
     "stock_router",
     "stream_router",
 ]

@@ -1,1 +1,1 @@
-"""SETUVYUHA API application package."""
+"""SETUVYUHA FastAPI backend application package."""

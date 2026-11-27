@@ -38,7 +38,7 @@ export const App: React.FC = () => {
 
   if (currentPath.startsWith('/evaluation') || currentPath.startsWith('/eval')) {
     content = <EvaluationWorkspacePage />;
-  if (currentPath.startsWith('/cases/steering')) {
+  } else if (currentPath.startsWith('/cases/steering')) {
     content = <CaseSteeringPage />;
   } else if (currentPath.startsWith('/planner')) {
     const id = currentPath.startsWith('/planner/orders/')

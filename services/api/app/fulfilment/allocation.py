@@ -63,7 +63,9 @@ def allocate_orders(
     if order_id is not None:
         filters.append(CustomerOrder.id == order_id)
 
-    orders = list(db.execute(select(CustomerOrder).where(*filters)).scalars().all())
+    orders = list(
+        db.execute(select(CustomerOrder).where(*filters).with_for_update()).scalars().all()
+    )
     orders.sort(key=order_priority_key)
 
     now_utc = datetime.now(timezone.utc)

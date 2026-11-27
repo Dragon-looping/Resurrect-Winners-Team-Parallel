@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/setuvyuha"
     sql_echo: bool = False
     feed_stale_threshold_seconds: int = 60
+    recovery_margin_floor_pct: float = 10.0
 
 
 @lru_cache(maxsize=1)

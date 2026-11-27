@@ -156,3 +156,100 @@ def create_purchase_order_from_proposal(
     db.commit()
     db.refresh(po)
     return _to_po_response(db, po)
+
+
+ALLOWED_PO_TRANSITIONS: dict[PurchaseOrderStatus, frozenset[PurchaseOrderStatus]] = {
+    PurchaseOrderStatus.CREATED: frozenset(
+        {PurchaseOrderStatus.READY_TO_SEND, PurchaseOrderStatus.SENT, PurchaseOrderStatus.CANCELLED}
+    ),
+    PurchaseOrderStatus.READY_TO_SEND: frozenset(
+        {PurchaseOrderStatus.SENT, PurchaseOrderStatus.CANCELLED}
+    ),
+    PurchaseOrderStatus.SENT: frozenset(
+        {PurchaseOrderStatus.ACKNOWLEDGED, PurchaseOrderStatus.CANCELLED}
+    ),
+    PurchaseOrderStatus.ACKNOWLEDGED: frozenset(
+        {PurchaseOrderStatus.FULFILLED, PurchaseOrderStatus.CANCELLED}
+    ),
+    PurchaseOrderStatus.FULFILLED: frozenset(),
+    PurchaseOrderStatus.CANCELLED: frozenset(),
+}
+
+
+def list_purchase_orders(
+    db: Session,
+    *,
+    status_filter: PurchaseOrderStatus | None = None,
+) -> list[PurchaseOrderResponse]:
+    """List purchase orders ordered newest-first, optionally filtered by status."""
+    stmt = select(PurchaseOrder)
+    if status_filter is not None:
+        stmt = stmt.where(PurchaseOrder.status == status_filter.value)
+    stmt = stmt.order_by(PurchaseOrder.created_at.desc(), PurchaseOrder.id.desc())
+    rows = list(db.execute(stmt).scalars().all())
+    return [_to_po_response(db, po) for po in rows]
+
+
+def get_purchase_order(db: Session, po_id: int) -> PurchaseOrderResponse:
+    """Retrieve a single purchase order by ID."""
+    po = db.execute(select(PurchaseOrder).where(PurchaseOrder.id == po_id)).scalar_one_or_none()
+    if po is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Purchase Order {po_id} not found.",
+        )
+    return _to_po_response(db, po)
+
+
+def transition_po_status(
+    db: Session,
+    po_id: int,
+    *,
+    target_status: PurchaseOrderStatus,
+    expected_version: int,
+    actor: ActorContext,
+    notes: str | None = None,
+) -> PurchaseOrderResponse:
+    """Validate and apply a Purchase Order status transition with audit trail."""
+    require_human_approver(actor)
+
+    po = db.execute(select(PurchaseOrder).where(PurchaseOrder.id == po_id)).scalar_one_or_none()
+    if po is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Purchase Order {po_id} not found.",
+        )
+    if po.version != expected_version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Version conflict on {po.po_number}: expected {expected_version}, found {po.version}.",
+        )
+
+    current_status = PurchaseOrderStatus(po.status)
+    allowed_next = ALLOWED_PO_TRANSITIONS.get(current_status, frozenset())
+    if target_status not in allowed_next:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Invalid PO transition from '{current_status.value}' to '{target_status.value}'.",
+        )
+
+    po.status = target_status.value
+    po.version += 1
+
+    record_audit_log(
+        db,
+        entity_type="PURCHASE_ORDER",
+        entity_id=po.po_number,
+        action="PO_STATUS_UPDATED",
+        actor_id=actor.actor_id,
+        actor_role=actor.role.value,
+        details={
+            "from_status": current_status.value,
+            "to_status": target_status.value,
+            "notes": notes or "",
+            "new_version": po.version,
+        },
+    )
+    db.commit()
+    db.refresh(po)
+    return _to_po_response(db, po)

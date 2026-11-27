@@ -146,4 +146,19 @@ Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/inventory/replay"
 
 ## Demo Scenario
 
-Canonical demo plants (`Mangaluru`, `Udupi`, `Manipal`) and SKUs (`Electric fans`, `Motors`, `Copper wire`) are defined in `app/inventory/demo.py` (`seed_demo_catalog`) and verified end-to-end in `tests/test_demo_scenario.py`. Demo records are never inserted automatically into production databases.
+Canonical demo plants (`Mangaluru`, `Udupi`, `Manipal`) and SKUs (`Electric fans`, `Motors`, `Copper wire`) are defined in `app/inventory/demo.py` (`seed_demo_catalog`) and `app/fulfilment/demo.py` (`seed_order_lifecycle_demo`), and verified end-to-end in `tests/test_demo_scenario.py` and `tests/test_order_lifecycle_integration.py`. Demo records are never inserted automatically into production databases.
+
+## Order Lifecycle Endpoints
+
+- `POST /orders` — Create a customer order (preserves original CRD).
+- `GET /orders` — List orders with pagination and filters (`plant_id`, `sku_id`, `status`).
+- `GET /orders/{order_id}` — Fetch order details.
+- `GET /orders/{order_id}/history` — View lifecycle status audit trail.
+- `POST /orders/{order_id}/status` — Apply validated status transition.
+- `POST /orders/allocate` — Allocate inventory by `(agreed_delivery_date, created_at, id)`.
+- `POST /orders/{order_id}/release` — Release active reservations back to available stock.
+- `GET /orders/{order_id}/allocations` — List order allocations.
+- `GET /orders/backlog` & `GET /orders/risk` — Backlog and delivery risk (distinguishing stale feeds from shortages).
+- `POST /orders/{order_id}/offers` & `POST /offers/{offer_id}/reply` — Customer delivery offers and replies (CRD preserved).
+- `POST /orders/{order_id}/plans` & `POST /plans/{plan_id}/approve` — Deterministic plan preview and transactional approval.
+- `POST /production/batches`, `GET /production/batches`, `POST /production/batches/{batch_id}/complete` — Production batch readiness and idempotent output receipt.

@@ -83,6 +83,16 @@ export const Layout: React.FC<LayoutProps> = ({
               Planner Workspace
             </button>
             <button
+              onClick={() => onNavigate && onNavigate('/evaluation')}
+              style={{
+                textDecoration: 'none',
+                fontWeight: activeRoute.startsWith('/evaluation') || activeRoute.startsWith('/eval') ? 600 : 400,
+                color: activeRoute.startsWith('/evaluation') || activeRoute.startsWith('/eval') ? 'var(--oxide-red)' : 'var(--ink-secondary)',
+                borderBottom: activeRoute.startsWith('/evaluation') || activeRoute.startsWith('/eval') ? '2px solid var(--oxide-red)' : '2px solid transparent',
+                paddingBottom: '2px'
+              }}
+            >
+              PS3 Evaluation
               onClick={() => onNavigate && onNavigate('/cases/steering')}
               style={{
                 textDecoration: 'none',
@@ -96,7 +106,11 @@ export const Layout: React.FC<LayoutProps> = ({
             </button>
           </div>
           <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-faint)', fontSize: '0.75rem' }}>
-            {activeRoute.startsWith('/planner') ? 'BRANCH 2: PLANNER WORKSPACE' : 'BRANCH 1: CUSTOMER PORTAL'}
+            {activeRoute.startsWith('/evaluation') || activeRoute.startsWith('/eval')
+              ? 'BRANCH 3: PS3 EVALUATION DEMO'
+              : activeRoute.startsWith('/planner')
+              ? 'BRANCH 2: PLANNER WORKSPACE'
+              : 'BRANCH 1: CUSTOMER PORTAL'}
           </div>
         </div>
       </nav>

@@ -4,6 +4,7 @@ import { IntakePage } from './customer/pages/IntakePage.tsx';
 import { OrderPortalPage } from './customer/pages/OrderPortalPage.tsx';
 import { CaseSteeringPage } from './cases/CaseSteeringPage.tsx';
 import { PlannerWorkspacePage } from './planner/pages/PlannerWorkspacePage.tsx';
+import { EvaluationWorkspacePage } from './evaluation/pages/EvaluationWorkspacePage.tsx';
 
 export const App: React.FC = () => {
   const [currentPath, setCurrentPath] = useState<string>(() => {
@@ -35,6 +36,8 @@ export const App: React.FC = () => {
   let content = null;
   let orderRef = undefined;
 
+  if (currentPath.startsWith('/evaluation') || currentPath.startsWith('/eval')) {
+    content = <EvaluationWorkspacePage />;
   if (currentPath.startsWith('/cases/steering')) {
     content = <CaseSteeringPage />;
   } else if (currentPath.startsWith('/planner')) {

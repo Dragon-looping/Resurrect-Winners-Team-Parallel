@@ -7,6 +7,7 @@ from app.core.database import get_db
 from app.fulfilment.allocation import allocate_orders, release_order_allocations
 from app.fulfilment.lifecycle import get_order_history, transition_order_status
 from app.fulfilment.orders import OrderError, create_order, get_order_by_id, list_orders
+from app.fulfilment.risk import OrderRiskItem, assess_backlog_and_risk
 from app.inventory.ingestion import EventValidationError
 from app.models import OrderAllocation
 from app.models.enums import OrderStatus
@@ -71,6 +72,36 @@ def get_customer_orders(
         offset=offset,
         items=[OrderResponse.model_validate(item) for item in items],
     )
+
+
+@router.get(
+    "/orders/backlog",
+    response_model=list[OrderRiskItem],
+    summary="List order backlog",
+    description="Returns unfulfilled orders with shortages, allocated quantities, and expected availability.",
+)
+def get_order_backlog(
+    plant_id: int | None = Query(default=None, gt=0),
+    sku_id: int | None = Query(default=None, gt=0),
+    db: Session = Depends(get_db),
+) -> list[OrderRiskItem]:
+    """Return unfulfilled order backlog."""
+    return assess_backlog_and_risk(db, plant_id=plant_id, sku_id=sku_id, only_at_risk=False)
+
+
+@router.get(
+    "/orders/risk",
+    response_model=list[OrderRiskItem],
+    summary="List orders at delivery risk",
+    description="Returns orders at risk of missing their agreed delivery date, distinguishing stale feeds from shortages.",
+)
+def get_order_delivery_risk(
+    plant_id: int | None = Query(default=None, gt=0),
+    sku_id: int | None = Query(default=None, gt=0),
+    db: Session = Depends(get_db),
+) -> list[OrderRiskItem]:
+    """Return orders at delivery risk."""
+    return assess_backlog_and_risk(db, plant_id=plant_id, sku_id=sku_id, only_at_risk=True)
 
 
 @router.get(

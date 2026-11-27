@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "moduleResolution": "node10",
+    "ignoreDeprecations": "6.0",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noCheck": true,
+    "rootDir": "src",
+    "outDir": ".tmp-test"
+  },
+  "include": [
+    "src/services/config.ts",
+    "src/services/apiClient.ts",
+    "src/services/eventService.ts",
+    "src/services/inventoryService.ts",
+    "src/services/sequenceStore.ts",
+    "src/types/inventory.ts"
+  ]
+}

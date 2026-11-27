@@ -23,6 +23,7 @@ import { AppProvider, useApp } from './src/context/AppContext';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { DashboardScreen } from './src/screens/DashboardScreen';
 import { PlantSkuSelectionScreen } from './src/screens/PlantSkuSelectionScreen';
+import { WarehouseNetworkScreen } from './src/screens/WarehouseNetworkScreen';
 import { GoodsReceivedScreen } from './src/screens/GoodsReceivedScreen';
 import { GoodsDispatchScreen } from './src/screens/GoodsDispatchScreen';
 import { PhysicalStockCorrectionScreen } from './src/screens/PhysicalStockCorrectionScreen';
@@ -49,6 +50,8 @@ const RootNavigator: React.FC = () => {
       return <DashboardScreen />;
     case 'PlantSkuSelection':
       return <PlantSkuSelectionScreen />;
+    case 'WarehouseNetwork':
+      return <WarehouseNetworkScreen />;
     case 'GoodsReceived':
       return <GoodsReceivedScreen />;
     case 'GoodsDispatch':

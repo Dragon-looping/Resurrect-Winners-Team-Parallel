@@ -3,13 +3,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.auth import assert_plant_access, get_scoped_warehouse_user
 from app.core.database import get_db
 from app.fulfilment.allocation import allocate_orders, release_order_allocations
 from app.fulfilment.lifecycle import get_order_history, transition_order_status
 from app.fulfilment.orders import OrderError, create_order, get_order_by_id, list_orders
 from app.fulfilment.risk import OrderRiskItem, assess_backlog_and_risk
 from app.inventory.ingestion import EventValidationError
-from app.models import OrderAllocation
+from app.models import OrderAllocation, WarehouseUser
 from app.models.enums import OrderStatus
 from app.schemas.order import (
     OrderAllocationResponse,
@@ -33,9 +34,11 @@ router = APIRouter(tags=["Orders"])
 )
 def create_customer_order(
     payload: OrderCreate,
+    scoped_user: WarehouseUser | None = Depends(get_scoped_warehouse_user),
     db: Session = Depends(get_db),
 ) -> OrderResponse:
     """Create a new customer order."""
+    assert_plant_access(scoped_user, payload.plant_id)
     try:
         order = create_order(db, payload)
     except (OrderError, EventValidationError) as exc:
@@ -55,14 +58,16 @@ def get_customer_orders(
     plant_id: int | None = Query(default=None, gt=0),
     sku_id: int | None = Query(default=None, gt=0),
     status_filter: OrderStatus | None = Query(default=None, alias="status"),
+    scoped_user: WarehouseUser | None = Depends(get_scoped_warehouse_user),
     db: Session = Depends(get_db),
 ) -> PaginatedOrdersResponse:
     """List customer orders."""
+    effective_plant_id = assert_plant_access(scoped_user, plant_id)
     items, total = list_orders(
         db,
         limit=limit,
         offset=offset,
-        plant_id=plant_id,
+        plant_id=effective_plant_id,
         sku_id=sku_id,
         status=status_filter,
     )
@@ -83,10 +88,12 @@ def get_customer_orders(
 def get_order_backlog(
     plant_id: int | None = Query(default=None, gt=0),
     sku_id: int | None = Query(default=None, gt=0),
+    scoped_user: WarehouseUser | None = Depends(get_scoped_warehouse_user),
     db: Session = Depends(get_db),
 ) -> list[OrderRiskItem]:
     """Return unfulfilled order backlog."""
-    return assess_backlog_and_risk(db, plant_id=plant_id, sku_id=sku_id, only_at_risk=False)
+    effective_plant_id = assert_plant_access(scoped_user, plant_id)
+    return assess_backlog_and_risk(db, plant_id=effective_plant_id, sku_id=sku_id, only_at_risk=False)
 
 
 @router.get(
@@ -98,10 +105,12 @@ def get_order_backlog(
 def get_order_delivery_risk(
     plant_id: int | None = Query(default=None, gt=0),
     sku_id: int | None = Query(default=None, gt=0),
+    scoped_user: WarehouseUser | None = Depends(get_scoped_warehouse_user),
     db: Session = Depends(get_db),
 ) -> list[OrderRiskItem]:
     """Return orders at delivery risk."""
-    return assess_backlog_and_risk(db, plant_id=plant_id, sku_id=sku_id, only_at_risk=True)
+    effective_plant_id = assert_plant_access(scoped_user, plant_id)
+    return assess_backlog_and_risk(db, plant_id=effective_plant_id, sku_id=sku_id, only_at_risk=True)
 
 
 @router.get(
@@ -112,6 +121,7 @@ def get_order_delivery_risk(
 )
 def get_customer_order(
     order_id: int,
+    scoped_user: WarehouseUser | None = Depends(get_scoped_warehouse_user),
     db: Session = Depends(get_db),
 ) -> OrderResponse:
     """Fetch a single customer order."""
@@ -119,6 +129,7 @@ def get_customer_order(
         order = get_order_by_id(db, order_id)
     except OrderError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
+    assert_plant_access(scoped_user, order.plant_id)
     return OrderResponse.model_validate(order)
 
 
@@ -130,13 +141,15 @@ def get_customer_order(
 )
 def get_customer_order_history(
     order_id: int,
+    scoped_user: WarehouseUser | None = Depends(get_scoped_warehouse_user),
     db: Session = Depends(get_db),
 ) -> list[OrderStatusHistoryResponse]:
     """Fetch status history for an order."""
     try:
-        get_order_by_id(db, order_id)
+        order = get_order_by_id(db, order_id)
     except OrderError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
+    assert_plant_access(scoped_user, order.plant_id)
     history = get_order_history(db, order_id)
     return [OrderStatusHistoryResponse.model_validate(h) for h in history]
 

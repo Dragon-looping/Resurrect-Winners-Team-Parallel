@@ -3,8 +3,9 @@
 from collections.abc import Generator
 from typing import Any
 
-from sqlalchemy import MetaData, create_engine, event
+from sqlalchemy import MetaData, create_engine, event, text
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -36,6 +37,12 @@ def create_db_engine(database_url: str, *, echo: bool = False) -> Engine:
         engine_kwargs["connect_args"] = {"check_same_thread": False}
         if ":memory:" in database_url:
             engine_kwargs["poolclass"] = StaticPool
+    else:
+        engine_kwargs["connect_args"] = {"connect_timeout": 5}
+        engine_kwargs["pool_size"] = 5
+        engine_kwargs["max_overflow"] = 10
+        engine_kwargs["pool_timeout"] = 10
+        engine_kwargs["pool_recycle"] = 1800
 
     engine = create_engine(database_url, **engine_kwargs)
 
@@ -83,6 +90,20 @@ def reset_db_state() -> None:
         _engine.dispose()
     _engine = None
     _session_factory = None
+
+
+def check_database_connectivity() -> tuple[bool, str | None]:
+    """Verify database connectivity with SELECT 1 without exposing credentials."""
+    try:
+        with get_engine().connect() as connection:
+            connection.execute(text("SELECT 1"))
+        return True, None
+    except SQLAlchemyError as exc:
+        err_type = type(exc).__name__
+        return (
+            False,
+            f"Database unreachable ({err_type}). Verify PostgreSQL is running and DATABASE_URL is valid.",
+        )
 
 
 def get_db() -> Generator[Session, None, None]:

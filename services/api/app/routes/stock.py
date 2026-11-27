@@ -6,9 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.auth import assert_plant_access, get_scoped_warehouse_user
 from app.core.database import get_db
 from app.inventory.engine import calculate_stock_snapshot
-from app.models import InventoryBalance, InventoryEvent, Plant, SKU
+from app.models import InventoryBalance, InventoryEvent, Plant, SKU, WarehouseUser
 from app.schemas.stock import StockItemResponse, StockListResponse
 
 router = APIRouter(tags=["Inventory Stock"])
@@ -76,17 +77,19 @@ def list_stock(
     plant_id: int | None = Query(default=None, gt=0),
     sku_id: int | None = Query(default=None, gt=0),
     as_of: datetime | date | None = Query(default=None, description="Optional date/datetime D for availability projection."),
+    scoped_user: WarehouseUser | None = Depends(get_scoped_warehouse_user),
     db: Session = Depends(get_db),
 ) -> StockListResponse:
     """List stock balances with optional plant, SKU, and date filters."""
+    effective_plant_id = assert_plant_access(scoped_user, plant_id)
     stmt = (
         select(InventoryBalance, Plant, SKU)
         .join(Plant, InventoryBalance.plant_id == Plant.id)
         .join(SKU, InventoryBalance.sku_id == SKU.id)
         .order_by(Plant.id.asc(), SKU.id.asc())
     )
-    if plant_id is not None:
-        stmt = stmt.where(InventoryBalance.plant_id == plant_id)
+    if effective_plant_id is not None:
+        stmt = stmt.where(InventoryBalance.plant_id == effective_plant_id)
     if sku_id is not None:
         stmt = stmt.where(InventoryBalance.sku_id == sku_id)
 
@@ -104,9 +107,11 @@ def list_stock(
 def get_stock_by_plant(
     plant_id: int,
     as_of: datetime | date | None = Query(default=None),
+    scoped_user: WarehouseUser | None = Depends(get_scoped_warehouse_user),
     db: Session = Depends(get_db),
 ) -> StockListResponse:
     """Return stock balances for a specific plant."""
+    assert_plant_access(scoped_user, plant_id)
     plant = db.execute(select(Plant).where(Plant.id == plant_id)).scalar_one_or_none()
     if plant is None:
         raise HTTPException(
@@ -134,9 +139,11 @@ def get_stock_by_plant_and_sku(
     plant_id: int,
     sku_id: int,
     as_of: datetime | date | None = Query(default=None),
+    scoped_user: WarehouseUser | None = Depends(get_scoped_warehouse_user),
     db: Session = Depends(get_db),
 ) -> StockItemResponse:
     """Return stock balance for a specific plant and SKU."""
+    assert_plant_access(scoped_user, plant_id)
     plant = db.execute(select(Plant).where(Plant.id == plant_id)).scalar_one_or_none()
     if plant is None:
         raise HTTPException(

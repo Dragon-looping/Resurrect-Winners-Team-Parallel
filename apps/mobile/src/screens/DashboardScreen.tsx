@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -14,10 +14,14 @@ import { BottomNav } from '../components/ui/BottomNav';
 import { AlertBanner } from '../components/ui/AlertBanner';
 import { Button } from '../components/ui/Button';
 import { BadgeVariant, StatusBadge } from '../components/ui/StatusBadge';
+import { DevApiDiagnosticsModal } from '../components/dev/DevApiDiagnosticsModal';
+
+const IS_DEV = typeof __DEV__ !== 'undefined' && __DEV__;
 
 export const DashboardScreen: React.FC = () => {
   const {
     activePlant,
+    isPlantLocked,
     plantSkus,
     activeSku,
     inboundShipments,
@@ -35,6 +39,8 @@ export const DashboardScreen: React.FC = () => {
     selectSku,
     refreshLiveData,
   } = useApp();
+
+  const [diagnosticsVisible, setDiagnosticsVisible] = useState(false);
 
   const totals = useMemo(() => {
     const onHand = plantSkus.reduce((acc, s) => acc + s.onHand, 0);
@@ -91,17 +97,26 @@ export const DashboardScreen: React.FC = () => {
                 </Text>
                 <Text style={styles.monoSub}>{activePlant.sublabel}</Text>
               </View>
-              <Pressable
-                onPress={() => navigate('PlantSkuSelection')}
-                accessibilityRole="button"
-                accessibilityLabel="Switch plant or SKU"
-                style={({ pressed }) => [
-                  styles.switchBtn,
-                  pressed && styles.pressedSurface,
-                ]}
-              >
-                <Text style={styles.switchBtnText}>Switch</Text>
-              </Pressable>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  {dataSourceMode === 'demo' && (
+                    <StatusBadge label="DEMO" variant="warning" />
+                  )}
+                  {isPlantLocked ? (
+                    <StatusBadge label="Assigned" variant="success" />
+                  ) : (
+                    <Pressable
+                      onPress={() => navigate('PlantSkuSelection')}
+                      accessibilityRole="button"
+                      accessibilityLabel="Switch plant or SKU"
+                      style={({ pressed }) => [
+                        styles.switchBtn,
+                        pressed && styles.pressedSurface,
+                      ]}
+                    >
+                      <Text style={styles.switchBtnText}>Switch</Text>
+                    </Pressable>
+                  )}
+                </View>
             </View>
 
             <View style={styles.feedDivider}>
@@ -144,13 +159,18 @@ export const DashboardScreen: React.FC = () => {
                     ]}
                   >
                     {isOffline
-                      ? 'Warehouse Feed Paused · Offline'
+                      ? `Warehouse Feed Paused · ${dataSourceMode === 'demo' ? 'DEMO' : 'Offline'}`
                       : feedHealth
                         ? `Feed ${feedHealth.status}${feedHealth.isStale ? ' · Stale' : ''} (${feedHealth.source})`
-                        : `Feed UNKNOWN · ${dataSourceMode === 'cached' ? 'Cached' : 'Local'}`}
+                        : `Feed UNKNOWN · ${dataSourceMode === 'cached' ? 'Cached' : 'DEMO'}`}
                   </Text>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  {IS_DEV && (
+                    <Pressable onPress={() => setDiagnosticsVisible(true)} hitSlop={8}>
+                      <Text style={styles.primaryLink}>API Diag</Text>
+                    </Pressable>
+                  )}
                   {!isOffline && (
                     <Pressable onPress={refreshLiveData} hitSlop={8}>
                       <Text style={styles.primaryLink}>
@@ -224,7 +244,7 @@ export const DashboardScreen: React.FC = () => {
                   {totals.onHand.toLocaleString()}
                 </Text>
                 <Text style={styles.monoSub}>
-                  Motors & Fans · {totals.skuCount} SKUs
+                  {activePlant.godownLabel} · {totals.skuCount} SKUs
                 </Text>
               </View>
               <View style={styles.ledgerCell}>
@@ -279,23 +299,31 @@ export const DashboardScreen: React.FC = () => {
             </View>
           </View>
 
-          {/* Inbound Motor Shipment Card */}
+          {/* Inbound Shipment Card */}
           {inbound && (
             <View style={styles.card}>
               <View style={styles.inboundHeader}>
-                <Text style={styles.eyebrow}>Inbound Motor Shipment</Text>
+                <Text style={styles.eyebrow}>
+                  Inbound Shipment{inbound.isDemo ? ' · DEMO' : ''}
+                </Text>
                 <StatusBadge
-                  label={inbound.status === 'delayed' ? 'Delayed' : 'On Time'}
-                  variant={inbound.status === 'delayed' ? 'warning' : 'success'}
+                  label={
+                    inbound.status === 'in_transit'
+                      ? 'In Transit'
+                      : inbound.status === 'delayed'
+                        ? 'Delayed'
+                        : 'On Time'
+                  }
+                  variant={inbound.status === 'on_time' ? 'success' : 'warning'}
                 />
               </View>
               <View style={styles.inboundBody}>
                 <View style={styles.inboundTextCol}>
                   <Text style={styles.titleMd}>
-                    {inbound.skuId} · +{inbound.qty} EA
+                    {inbound.skuName ?? inbound.skuId} · Expected {inbound.qty} EA
                   </Text>
                   <Text style={styles.monoSub}>
-                    Expected {inbound.expectedTime} · ETA {inbound.etaTime}
+                    {inbound.skuId} · {inbound.poNumber} · ETA {inbound.etaTime}
                   </Text>
                 </View>
                 <Pressable
@@ -424,6 +452,12 @@ export const DashboardScreen: React.FC = () => {
       </ScrollView>
 
       <BottomNav />
+      {IS_DEV && (
+        <DevApiDiagnosticsModal
+          visible={diagnosticsVisible}
+          onClose={() => setDiagnosticsVisible(false)}
+        />
+      )}
     </View>
   );
 };

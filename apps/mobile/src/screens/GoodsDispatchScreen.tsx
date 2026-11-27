@@ -15,12 +15,9 @@ import { QuantityStepper } from '../components/ui/QuantityStepper';
 import { AlertBanner } from '../components/ui/AlertBanner';
 import { Button } from '../components/ui/Button';
 import { generateStableEventId } from '../services/eventService';
+import { DEMO_DISPATCH_DESTINATIONS } from '../data/demoData';
 
-const DOCK_OPTIONS = [
-  'Outbound Dock B — Mangaluru',
-  'Fan Assembly Line 2',
-  'Inter-Plant Transfer — Udupi',
-];
+const DOCK_OPTIONS = DEMO_DISPATCH_DESTINATIONS;
 
 export const GoodsDispatchScreen: React.FC = () => {
   const {
@@ -46,18 +43,18 @@ export const GoodsDispatchScreen: React.FC = () => {
     const initial =
       editingEvent && editingEvent.operation === 'goods_dispatch'
         ? Math.abs(editingEvent.qtyDelta)
-        : 180;
+        : 20;
     return availableQty > 0 ? Math.min(availableQty, Math.max(1, initial)) : 0;
   });
   const [workOrder, setWorkOrder] = useState(
-    editingEvent?.referenceValue ?? 'WO-7731-B'
+    editingEvent?.referenceValue ?? ''
   );
   const [destination, setDestination] = useState(
     editingEvent?.destinationOrBin ?? DOCK_OPTIONS[0]
   );
   const [dockDropdownOpen, setDockDropdownOpen] = useState(false);
   const [handlerId, setHandlerId] = useState(
-    editingEvent?.conditionOrHandler ?? 'TUG-09 · R. Shetty'
+    editingEvent?.conditionOrHandler ?? ''
   );
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);

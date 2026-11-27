@@ -145,12 +145,11 @@ const styles = StyleSheet.create({
   },
   logoWrap: {
     justifyContent: 'center',
-    overflow: 'hidden',
-    flexShrink: 0,
+    flexShrink: 1,
   },
   logo: {
-    width: 104,
-    height: 24,
+    width: 134,
+    height: 22,
   },
   mainRight: {
     flexDirection: 'row',

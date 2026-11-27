@@ -9,12 +9,13 @@ from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.auth import assert_plant_access, get_scoped_warehouse_user
 from app.core.database import get_db
 from app.core.events_bus import event_stream_broker
 from app.inventory.feeds import record_feed_event_failure, record_feed_event_success
 from app.inventory.ingestion import EventValidationError, ingest_event
 from app.inventory.quarantine import list_quarantined_events, quarantine_event
-from app.models import InventoryEvent, InventoryEventType
+from app.models import InventoryEvent, InventoryEventType, WarehouseUser
 from app.schemas.event import (
     EventIngestionResponse,
     InventoryEventCreate,
@@ -60,6 +61,7 @@ def _sanitize_json_errors(errors: list[Any]) -> list[dict[str, Any]]:
 async def create_inventory_event(
     request: Request,
     response: Response,
+    scoped_user: WarehouseUser | None = Depends(get_scoped_warehouse_user),
     db: Session = Depends(get_db),
 ) -> EventIngestionResponse:
     """Validate, persist, or quarantine an incoming inventory event."""
@@ -127,6 +129,8 @@ async def create_inventory_event(
                 "quarantined_event_id": quarantined.id,
             },
         ) from exc
+
+    assert_plant_access(scoped_user, payload.plant_id)
 
     try:
         persisted_event, is_duplicate = ingest_event(db, payload)
@@ -233,12 +237,14 @@ def list_events(
     event_type: InventoryEventType | None = Query(default=None),
     start_date: date | None = Query(default=None),
     end_date: date | None = Query(default=None),
+    scoped_user: WarehouseUser | None = Depends(get_scoped_warehouse_user),
     db: Session = Depends(get_db),
 ) -> PaginatedInventoryEventsResponse:
     """List persisted valid inventory events."""
+    effective_plant_id = assert_plant_access(scoped_user, plant_id)
     filters = []
-    if plant_id is not None:
-        filters.append(InventoryEvent.plant_id == plant_id)
+    if effective_plant_id is not None:
+        filters.append(InventoryEvent.plant_id == effective_plant_id)
     if sku_id is not None:
         filters.append(InventoryEvent.sku_id == sku_id)
     if event_type is not None:

@@ -2,6 +2,7 @@ export type ScreenName =
   | 'Login'
   | 'Dashboard'
   | 'PlantSkuSelection'
+  | 'WarehouseNetwork'
   | 'GoodsReceived'
   | 'GoodsDispatch'
   | 'PhysicalStockCorrection'
@@ -40,11 +41,13 @@ export interface InboundShipment {
   id: string;
   plantId: string;
   skuId: string;
+  skuName?: string;
   qty: number;
   expectedTime: string;
   etaTime: string;
-  status: 'on_time' | 'delayed';
+  status: 'on_time' | 'delayed' | 'in_transit';
   poNumber: string;
+  isDemo?: boolean;
 }
 
 export type EventOperation =
@@ -84,6 +87,7 @@ export interface InventoryEvent {
   status: EventStatus;
   serverConfirmed?: boolean;
   serverId?: number;
+  isDemo?: boolean;
   quarantined?: boolean;
   quarantinedEventId?: number;
   createdAtIso: string;
@@ -97,10 +101,61 @@ export interface InventoryEvent {
 
 export interface AuthUser {
   email: string;
+  loginId?: string;
   name?: string;
   role?: string;
+  plantId?: number;
+  plantName?: string;
+  plantLocation?: string;
   token?: string;
   isDevMode?: boolean;
+}
+
+export type InterWarehouseRequestStatus =
+  | 'PENDING'
+  | 'APPROVED'
+  | 'PARTIALLY_APPROVED'
+  | 'REJECTED'
+  | 'DISPATCHED'
+  | 'PARTIALLY_FULFILLED'
+  | 'FULFILLED'
+  | 'CANCELLED';
+
+export interface NetworkAvailabilityItem {
+  plant_id: number;
+  plant_name: string;
+  plant_location: string;
+  sku_id: number;
+  sku_code: string;
+  sku_name: string;
+  unit: string;
+  available_stock: number;
+  availability_status: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK';
+  updated_at: string | null;
+}
+
+export interface InterWarehouseRequest {
+  id: number;
+  request_code: string;
+  requesting_plant_id: number;
+  requesting_plant_name: string;
+  supplying_plant_id: number;
+  supplying_plant_name: string;
+  sku_id: number;
+  sku_code: string;
+  sku_name: string;
+  unit: string;
+  requested_qty: number;
+  approved_qty: number | null;
+  dispatched_qty: number;
+  received_qty: number;
+  status: InterWarehouseRequestStatus;
+  reason: string | null;
+  rejection_reason: string | null;
+  dispatch_event_id: number | null;
+  receipt_event_id: number | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export type BackendFeedStatus = 'HEALTHY' | 'STALE' | 'DEGRADED' | 'UNKNOWN';

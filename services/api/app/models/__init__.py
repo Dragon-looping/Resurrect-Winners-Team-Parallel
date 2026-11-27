@@ -3,6 +3,7 @@
 from app.models.enums import (
     EmailDeliveryStatus,
     FeedStatus,
+    InterWarehouseRequestStatus,
     InventoryEventType,
     OfferStatus,
     OrderStatus,
@@ -14,6 +15,7 @@ from app.models.enums import (
     RecoveryStatus,
     RecoveryType,
     UrgencyLevel,
+    WarehouseUserRole,
 )
 from app.models.feed_health import FeedHealth
 from app.models.inventory_balance import InventoryBalance
@@ -38,6 +40,11 @@ from app.models.procurement import (
 from app.models.quarantined_event import QuarantinedEvent
 from app.models.recovery import RecoveryAuditLog, RecoveryPlan, RecoveryRoute
 from app.models.sku import SKU
+from app.models.warehouse_auth import (
+    InterWarehouseRequest,
+    WarehouseAuditLog,
+    WarehouseUser,
+)
 
 __all__ = [
     "CustomerOffer",
@@ -45,6 +52,8 @@ __all__ = [
     "EmailDeliveryStatus",
     "FeedHealth",
     "FeedStatus",
+    "InterWarehouseRequest",
+    "InterWarehouseRequestStatus",
     "InventoryBalance",
     "InventoryEvent",
     "InventoryEventType",
@@ -74,4 +83,7 @@ __all__ = [
     "SupplierCatalogItem",
     "SupplierEmailLog",
     "UrgencyLevel",
+    "WarehouseAuditLog",
+    "WarehouseUser",
+    "WarehouseUserRole",
 ]

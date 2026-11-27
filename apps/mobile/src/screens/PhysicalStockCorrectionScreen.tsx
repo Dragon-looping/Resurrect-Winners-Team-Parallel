@@ -47,14 +47,14 @@ export const PhysicalStockCorrectionScreen: React.FC = () => {
     ) {
       return editingEvent.newQty;
     }
-    return Math.max(0, systemQty - 15);
+    return systemQty;
   });
   const [reasonCode, setReasonCode] = useState(
     editingEvent?.referenceValue ?? REASON_CODES[0]
   );
   const [reasonDropdownOpen, setReasonDropdownOpen] = useState(false);
   const [auditNote, setAuditNote] = useState(
-    editingEvent?.auditNote ?? 'Bin M-04 lower rack recount verified'
+    editingEvent?.auditNote ?? ''
   );
   const [submitting, setSubmitting] = useState(false);
 

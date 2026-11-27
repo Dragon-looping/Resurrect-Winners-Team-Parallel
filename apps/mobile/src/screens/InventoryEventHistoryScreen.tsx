@@ -246,9 +246,9 @@ export const InventoryEventHistoryScreen: React.FC = () => {
                         </Text>
                       </View>
                       <Text style={styles.monoSub} numberOfLines={1}>
-                        {evt.skuId} · {deltaPrefix}
+                        {evt.skuName} ({evt.skuId}) · {deltaPrefix}
                         {evt.qtyDelta} EA · {evt.timestampIst} ·{' '}
-                        {evt.serverConfirmed ? 'Server' : 'Local'}
+                        {evt.isDemo ? 'DEMO DATA' : evt.serverConfirmed ? 'Server' : 'Local'}
                       </Text>
                     </View>
 

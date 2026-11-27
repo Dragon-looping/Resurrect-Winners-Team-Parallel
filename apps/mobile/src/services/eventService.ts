@@ -1,7 +1,45 @@
-import { InventoryEvent } from '../types/inventory';
-import { getApiBaseUrl } from './config';
+import { EventOperation, InventoryEvent } from '../types/inventory';
+import { apiRequest } from './apiClient';
 
-// Tracks in-flight event IDs to prevent duplicate POST /events submissions
+export const MOBILE_EVENT_SOURCE = 'mobile-manager';
+
+export type BackendEventType =
+  | 'STOCK_RECEIVED'
+  | 'STOCK_DISPATCHED'
+  | 'PHYSICAL_COUNT';
+
+export interface BackendInventoryEventCreate {
+  source: string;
+  external_event_id: string;
+  plant_id: number;
+  sku_id: number;
+  event_type: BackendEventType;
+  quantity: number;
+  source_sequence: number;
+  occurred_at: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface BackendEventIngestionResponse {
+  status: 'accepted' | 'duplicate' | string;
+  idempotent: boolean;
+  message: string;
+  event: {
+    id: number;
+    source: string;
+    external_event_id: string;
+    plant_id: number;
+    sku_id: number;
+    event_type: string;
+    quantity: number;
+    source_sequence: number;
+    occurred_at: string;
+    received_at: string;
+    metadata: Record<string, unknown>;
+  };
+}
+
+// Tracks in-flight event IDs to prevent duplicate concurrent POST /events submissions
 const inFlightEventIds = new Set<string>();
 
 export function formatIstTime(date: Date = new Date()): string {
@@ -22,7 +60,6 @@ export function formatIstTime(date: Date = new Date()): string {
 
 export function formatShortIstTime(date: Date = new Date()): string {
   const full = formatIstTime(date);
-  // HH:MM IST
   return `${full.slice(0, 5)} IST`;
 }
 
@@ -33,14 +70,67 @@ export function generateStableEventId(existingCount: number): string {
   return `EVT-${year}-${num}-${suffix}`;
 }
 
+export function mapOperationToBackendEventType(
+  operation: EventOperation
+): BackendEventType {
+  switch (operation) {
+    case 'goods_received':
+      return 'STOCK_RECEIVED';
+    case 'goods_dispatch':
+      return 'STOCK_DISPATCHED';
+    case 'stock_correction':
+      return 'PHYSICAL_COUNT';
+  }
+}
+
+/**
+ * Builds the exact InventoryEventCreate payload expected by FastAPI POST /events.
+ */
+export function buildBackendEventPayload(
+  event: InventoryEvent
+): BackendInventoryEventCreate {
+  const eventType = mapOperationToBackendEventType(event.operation);
+
+  let quantity: number;
+  if (event.operation === 'stock_correction') {
+    quantity =
+      typeof event.newQty === 'number'
+        ? Math.max(0, event.newQty)
+        : Math.max(0, (event.previousQty ?? 0) + event.qtyDelta);
+  } else {
+    // Both STOCK_RECEIVED and STOCK_DISPATCHED require strictly positive quantity (> 0)
+    quantity = Math.abs(event.qtyDelta);
+  }
+
+  return {
+    source: MOBILE_EVENT_SOURCE,
+    external_event_id: event.eventId,
+    plant_id: event.backendPlantId,
+    sku_id: event.backendSkuId,
+    event_type: eventType,
+    quantity,
+    source_sequence: event.sourceSequence,
+    occurred_at: event.createdAtIso,
+    metadata: {
+      plant_code: event.plantId,
+      sku_code: event.skuId,
+      bin: event.bin,
+      reference: event.referenceValue,
+      destination_or_bin: event.destinationOrBin,
+      condition_or_handler: event.conditionOrHandler,
+      audit_note: event.auditNote,
+    },
+  };
+}
+
 export interface SyncOutcome {
   event: InventoryEvent;
   synced: boolean;
 }
 
 /**
- * Submits or retries an inventory event via POST /events using its stable eventId.
- * Prevents duplicate concurrent submissions for the same eventId.
+ * Submits or retries an inventory event via POST /events using its stable external_event_id
+ * and source_sequence. Prevents duplicate concurrent submissions and blind retries of quarantined events.
  */
 export async function syncInventoryEvent(
   event: InventoryEvent,
@@ -49,6 +139,11 @@ export async function syncInventoryEvent(
 ): Promise<SyncOutcome> {
   if (event.status === 'submitted') {
     return { event, synced: true };
+  }
+
+  // Quarantined events (HTTP 422) require payload editing before resubmission
+  if (event.quarantined) {
+    return { event, synced: false };
   }
 
   if (inFlightEventIds.has(event.eventId)) {
@@ -66,25 +161,7 @@ export async function syncInventoryEvent(
         {
           timeIst: nowTime,
           label: 'Queued Offline',
-          detail: 'Device offline — retained in local queue for idempotent sync',
-          tone: 'warning',
-        },
-      ],
-    };
-    return { event: updated, synced: false };
-  }
-
-  const baseUrl = getApiBaseUrl();
-  if (!baseUrl) {
-    const updated: InventoryEvent = {
-      ...event,
-      status: 'pending',
-      attempts: [
-        ...event.attempts,
-        {
-          timeIst: nowTime,
-          label: 'Sync Deferred (No API URL)',
-          detail: 'EXPO_PUBLIC_API_BASE_URL not configured — queued locally',
+          detail: `Retained locally (${event.eventId}, seq ${event.sourceSequence})`,
           tone: 'warning',
         },
       ],
@@ -93,49 +170,35 @@ export async function syncInventoryEvent(
   }
 
   inFlightEventIds.add(event.eventId);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
 
   try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    };
-    if (authToken) {
-      headers.Authorization = `Bearer ${authToken}`;
-    }
-
-    const response = await fetch(`${baseUrl}/events`, {
+    const payload = buildBackendEventPayload(event);
+    const result = await apiRequest<BackendEventIngestionResponse>('/events', {
       method: 'POST',
-      headers,
-      body: JSON.stringify({
-        event_id: event.eventId,
-        operation: event.operation,
-        plant_id: event.plantId,
-        sku_id: event.skuId,
-        qty_delta: event.qtyDelta,
-        previous_qty: event.previousQty,
-        new_qty: event.newQty,
-        reference: event.referenceValue,
-        destination_or_bin: event.destinationOrBin,
-        condition_or_handler: event.conditionOrHandler,
-        audit_note: event.auditNote,
-        created_at: event.createdAtIso,
-      }),
-      signal: controller.signal,
+      body: payload,
+      token: authToken,
     });
 
-    if (response.ok) {
+    if (result.ok) {
+      const isDuplicate =
+        result.status === 200 ||
+        result.data.idempotent ||
+        result.data.status === 'duplicate';
+
       const updated: InventoryEvent = {
         ...event,
         status: 'submitted',
+        quarantined: false,
+        quarantinedEventId: undefined,
         errorDiagnostics: undefined,
         attempts: [
           ...event.attempts,
           {
             timeIst: nowTime,
-            label: 'Synced to Backend',
-            detail: `HTTP ${response.status} · Event ${event.eventId} acknowledged`,
+            label: isDuplicate
+              ? 'Duplicate Accepted (Idempotent)'
+              : 'Synced to Backend',
+            detail: `HTTP ${result.status} · ${result.data.message}`,
             tone: 'success',
           },
         ],
@@ -143,49 +206,71 @@ export async function syncInventoryEvent(
       return { event: updated, synced: true };
     }
 
-    const codeLabel = `HTTP ${response.status}`;
+    if (result.error.kind === 'not_configured') {
+      const updated: InventoryEvent = {
+        ...event,
+        status: 'pending',
+        attempts: [
+          ...event.attempts,
+          {
+            timeIst: nowTime,
+            label: 'Sync Deferred (No API URL)',
+            detail: 'EXPO_PUBLIC_API_BASE_URL not configured — queued locally',
+            tone: 'warning',
+          },
+        ],
+      };
+      return { event: updated, synced: false };
+    }
+
+    if (result.error.kind === 'quarantined') {
+      const qId = result.error.quarantinedEventId;
+      const reason = result.error.reason ?? result.error.message;
+      const updated: InventoryEvent = {
+        ...event,
+        status: 'failed',
+        quarantined: true,
+        quarantinedEventId: qId,
+        errorDiagnostics: {
+          code: qId ? `HTTP 422 · Quarantine #${qId}` : 'HTTP 422 · Quarantined',
+          message: `${reason} Edit the payload before resubmitting.`,
+        },
+        attempts: [
+          ...event.attempts,
+          {
+            timeIst: nowTime,
+            label: 'Quarantined by Backend (HTTP 422)',
+            detail: qId ? `#${qId} · ${reason}` : reason,
+            tone: 'error',
+          },
+        ],
+      };
+      return { event: updated, synced: false };
+    }
+
+    const codeLabel = result.error.status
+      ? `HTTP ${result.error.status}`
+      : 'NETWORK_ERR';
     const updated: InventoryEvent = {
       ...event,
       status: 'failed',
+      quarantined: false,
       errorDiagnostics: {
         code: codeLabel,
-        message: `Backend rejected or timed out (${codeLabel}). Retrying reuses original event ID ${event.eventId} (idempotent, no duplicate stock deduction).`,
+        message: `${result.error.message} Retrying reuses ${event.eventId} (seq ${event.sourceSequence}) idempotently.`,
       },
       attempts: [
         ...event.attempts,
         {
           timeIst: nowTime,
           label: 'Sync Attempt Failed',
-          detail: `${codeLabel} · Server error`,
-          tone: 'error',
-        },
-      ],
-    };
-    return { event: updated, synced: false };
-  } catch (err) {
-    const isTimeout = err instanceof Error && err.name === 'AbortError';
-    const updated: InventoryEvent = {
-      ...event,
-      status: 'failed',
-      errorDiagnostics: {
-        code: isTimeout ? 'HTTP 504' : 'NETWORK_ERR',
-        message: isTimeout
-          ? `Gateway timed out. Retrying reuses original event ID ${event.eventId} (idempotent, no duplicate stock deduction).`
-          : `Network unreachable. Retrying reuses original event ID ${event.eventId} (idempotent).`,
-      },
-      attempts: [
-        ...event.attempts,
-        {
-          timeIst: nowTime,
-          label: 'Sync Attempt Failed',
-          detail: isTimeout ? 'HTTP 504 Gateway Timeout' : 'Network unreachable',
+          detail: `${codeLabel} · ${result.error.message}`,
           tone: 'error',
         },
       ],
     };
     return { event: updated, synced: false };
   } finally {
-    clearTimeout(timeout);
     inFlightEventIds.delete(event.eventId);
   }
 }

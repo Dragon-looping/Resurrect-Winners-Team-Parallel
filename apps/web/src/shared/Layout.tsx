@@ -93,6 +93,16 @@ export const Layout: React.FC<LayoutProps> = ({
               }}
             >
               PS3 Evaluation
+              onClick={() => onNavigate && onNavigate('/cases/steering')}
+              style={{
+                textDecoration: 'none',
+                fontWeight: activeRoute.startsWith('/cases/steering') ? 600 : 400,
+                color: activeRoute.startsWith('/cases/steering') ? 'var(--oxide-red)' : 'var(--ink-secondary)',
+                borderBottom: activeRoute.startsWith('/cases/steering') ? '2px solid var(--oxide-red)' : '2px solid transparent',
+                paddingBottom: '2px'
+              }}
+            >
+              Case Steering & Clarify
             </button>
           </div>
           <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-faint)', fontSize: '0.75rem' }}>

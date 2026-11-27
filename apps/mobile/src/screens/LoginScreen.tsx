@@ -14,6 +14,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, FontFamily, Radii, Spacing } from '../theme/tokens';
 import { useApp } from '../context/AppContext';
+import { isDevModeEnabled } from '../services/config';
 import { AlertBanner } from '../components/ui/AlertBanner';
 import { Button } from '../components/ui/Button';
 import { NetworkSchematicSvg } from '../components/ui/NetworkSchematicSvg';
@@ -21,9 +22,10 @@ import { NetworkSchematicSvg } from '../components/ui/NetworkSchematicSvg';
 const LOGO_SOURCE = require('../../assets/setuvyuha-logo.png');
 
 export const LoginScreen: React.FC = () => {
-  const { signIn } = useApp();
+  const { signIn, enterDevMode } = useApp();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 900;
+  const devModeAllowed = isDevModeEnabled();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -216,6 +218,21 @@ export const LoginScreen: React.FC = () => {
                 <Text style={styles.footerNotice}>
                   Authorized personnel only.
                 </Text>
+
+                {devModeAllowed && (
+                  <View style={styles.devModeBox}>
+                    <Button
+                      label="Continue in Development Mode"
+                      variant="secondary"
+                      leftIcon="developer-mode"
+                      onPress={enterDevMode}
+                      disabled={loading}
+                    />
+                    <Text style={styles.devModeHint}>
+                      Local development access only · bypasses server auth
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
           </View>
@@ -389,6 +406,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     color: Colors.onSurfaceVariant,
+    textAlign: 'center',
+  },
+  devModeBox: {
+    marginTop: Spacing.gutterXs,
+    paddingTop: Spacing.gutterMd,
+    borderTopWidth: 1,
+    borderTopColor: Colors.outlineVariant,
+    gap: Spacing.gutterXs,
+  },
+  devModeHint: {
+    fontFamily: FontFamily.mono,
+    fontSize: 11,
+    lineHeight: 15,
+    color: Colors.warning,
     textAlign: 'center',
   },
 });

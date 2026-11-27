@@ -1,0 +1,10 @@
+[project]
+name = "setuvyuha-api"
+version = "0.1.0"
+description = "SETUVYUHA Multi-Godown Fulfilment and Recovery Backend"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"

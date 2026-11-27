@@ -268,7 +268,7 @@ export const GoodsReceivedScreen: React.FC = () => {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.surface },
   scroll: { flex: 1 },
-  content: { padding: Spacing.pageMargin, paddingBottom: 32, alignItems: 'center' },
+  content: { padding: Spacing.pageMargin, paddingBottom: 48, alignItems: 'center' },
   responsiveColumn: { width: '100%', maxWidth: 680, gap: Spacing.gutterLg },
   contextCard: {
     backgroundColor: Colors.surfaceContainerLowest,

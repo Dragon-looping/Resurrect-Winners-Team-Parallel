@@ -202,3 +202,209 @@ export async function apiRequest<T>(
     clearTimeout(timeout);
   }
 }
+
+export type DevDiagnosticClassification =
+  | 'SUCCESS'
+  | 'NOT_CONFIGURED'
+  | 'TIMEOUT'
+  | 'NATIVE_IOS_NETWORK_FAILURE'
+  | 'DNS_OR_NETWORK_FAILURE'
+  | 'HTTP_401'
+  | 'HTTP_403'
+  | 'HTTP_404'
+  | 'HTTP_422'
+  | 'HTTP_500'
+  | 'HTTP_ERROR'
+  | 'INVALID_JSON'
+  | 'SCHEMA_MISMATCH';
+
+export interface DevEndpointDiagnosticResult {
+  endpointKey: 'health' | 'stock' | 'events' | 'feeds';
+  resolvedBaseUrl: string;
+  requestUrl: string;
+  method: 'GET';
+  startedAt: string;
+  completedAt: string;
+  durationMs: number;
+  status: number | null;
+  classification: DevDiagnosticClassification;
+  responseBodyPreview: string | null;
+  nativeErrorName: string | null;
+  nativeErrorMessage: string | null;
+}
+
+function validateDiagnosticSchema(
+  endpointKey: DevEndpointDiagnosticResult['endpointKey'],
+  parsed: unknown
+): boolean {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return false;
+  }
+  const obj = parsed as Record<string, unknown>;
+  switch (endpointKey) {
+    case 'health':
+      return typeof obj.status === 'string';
+    case 'stock':
+      return typeof obj.count === 'number' && Array.isArray(obj.items);
+    case 'events':
+      return typeof obj.total === 'number' && Array.isArray(obj.items);
+    case 'feeds':
+      return Array.isArray(obj.feeds);
+  }
+}
+
+export async function runDevEndpointDiagnostic(
+  endpointKey: DevEndpointDiagnosticResult['endpointKey'],
+  path: string
+): Promise<DevEndpointDiagnosticResult> {
+  const resolvedBaseUrl = getApiBaseUrl();
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const requestUrl = `${resolvedBaseUrl}${normalizedPath}`;
+  const startedMs = Date.now();
+  const startedAt = new Date(startedMs).toISOString();
+
+  if (!isDevDiagnosticsEnabled()) {
+    return {
+      endpointKey,
+      resolvedBaseUrl,
+      requestUrl,
+      method: 'GET',
+      startedAt,
+      completedAt: startedAt,
+      durationMs: 0,
+      status: null,
+      classification: 'NOT_CONFIGURED',
+      responseBodyPreview: 'Diagnostics disabled outside __DEV__.',
+      nativeErrorName: null,
+      nativeErrorMessage: null,
+    };
+  }
+
+  if (!resolvedBaseUrl) {
+    const completedAt = new Date().toISOString();
+    return {
+      endpointKey,
+      resolvedBaseUrl: '(empty)',
+      requestUrl: normalizedPath,
+      method: 'GET',
+      startedAt,
+      completedAt,
+      durationMs: Date.now() - startedMs,
+      status: null,
+      classification: 'NOT_CONFIGURED',
+      responseBodyPreview: null,
+      nativeErrorName: 'ConfigError',
+      nativeErrorMessage: 'EXPO_PUBLIC_API_BASE_URL is empty.',
+    };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(requestUrl, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    const rawText = await response.text();
+    const completedAt = new Date().toISOString();
+    const durationMs = Date.now() - startedMs;
+    const responseBodyPreview =
+      rawText.length > 360 ? `${rawText.slice(0, 360)}...` : rawText || '(empty body)';
+
+    if (!response.ok) {
+      const classification: DevDiagnosticClassification =
+        response.status === 401
+          ? 'HTTP_401'
+          : response.status === 403
+            ? 'HTTP_403'
+            : response.status === 404
+              ? 'HTTP_404'
+              : response.status === 422
+                ? 'HTTP_422'
+                : response.status >= 500
+                  ? 'HTTP_500'
+                  : 'HTTP_ERROR';
+      return {
+        endpointKey,
+        resolvedBaseUrl,
+        requestUrl,
+        method: 'GET',
+        startedAt,
+        completedAt,
+        durationMs,
+        status: response.status,
+        classification,
+        responseBodyPreview,
+        nativeErrorName: null,
+        nativeErrorMessage: null,
+      };
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      return {
+        endpointKey,
+        resolvedBaseUrl,
+        requestUrl,
+        method: 'GET',
+        startedAt,
+        completedAt,
+        durationMs,
+        status: response.status,
+        classification: 'INVALID_JSON',
+        responseBodyPreview,
+        nativeErrorName: null,
+        nativeErrorMessage: null,
+      };
+    }
+
+    const schemaValid = validateDiagnosticSchema(endpointKey, parsed);
+    return {
+      endpointKey,
+      resolvedBaseUrl,
+      requestUrl,
+      method: 'GET',
+      startedAt,
+      completedAt,
+      durationMs,
+      status: response.status,
+      classification: schemaValid ? 'SUCCESS' : 'SCHEMA_MISMATCH',
+      responseBodyPreview,
+      nativeErrorName: null,
+      nativeErrorMessage: null,
+    };
+  } catch (err) {
+    const completedAt = new Date().toISOString();
+    const durationMs = Date.now() - startedMs;
+    const errorName = err instanceof Error ? err.name : typeof err;
+    const errorMessage = err instanceof Error ? err.message : String(err);
+
+    let classification: DevDiagnosticClassification = 'DNS_OR_NETWORK_FAILURE';
+    if (errorName === 'AbortError') {
+      classification = 'TIMEOUT';
+    } else if (/network request failed|nsurl|ats|local network/i.test(errorMessage)) {
+      classification = 'NATIVE_IOS_NETWORK_FAILURE';
+    }
+
+    return {
+      endpointKey,
+      resolvedBaseUrl,
+      requestUrl,
+      method: 'GET',
+      startedAt,
+      completedAt,
+      durationMs,
+      status: null,
+      classification,
+      responseBodyPreview: null,
+      nativeErrorName: errorName,
+      nativeErrorMessage: errorMessage,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}

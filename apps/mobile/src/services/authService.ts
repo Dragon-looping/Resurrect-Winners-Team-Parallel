@@ -8,24 +8,32 @@ export interface AuthResult {
 }
 
 export interface AuthService {
-  signIn(email: string, password: string): Promise<AuthResult>;
+  signIn(loginId: string, password: string): Promise<AuthResult>;
   signOut(): Promise<void>;
 }
 
-/**
- * AuthService implementation targeting P2's FastAPI backend.
- * Production authentication remains unavailable until P2 adds POST /auth/login.
- * Does not invent credentials or fake successful authentication.
- */
+interface BackendLoginResponse {
+  access_token?: string;
+  token?: string;
+  user?: {
+    id?: number;
+    login_id?: string;
+    email?: string;
+    display_name?: string;
+    name?: string;
+    role?: string;
+    plant_id?: number;
+    plant_name?: string;
+    plant_location?: string;
+  };
+}
+
 class BackendAuthService implements AuthService {
-  async signIn(email: string, password: string): Promise<AuthResult> {
-    const result = await apiRequest<{
-      access_token?: string;
-      token?: string;
-      user?: { email?: string; name?: string; role?: string };
-    }>('/auth/login', {
+  async signIn(loginId: string, password: string): Promise<AuthResult> {
+    const trimmedLogin = loginId.trim().toLowerCase();
+    const result = await apiRequest<BackendLoginResponse>('/auth/login', {
       method: 'POST',
-      body: { email, password },
+      body: { login_id: trimmedLogin, password },
     });
 
     if (!result.ok) {
@@ -33,7 +41,7 @@ class BackendAuthService implements AuthService {
         return {
           ok: false,
           error:
-            'Authentication endpoint (POST /auth/login) is not yet available on the backend.',
+            'Authentication endpoint (POST /auth/login) is not available on the backend.',
         };
       }
       return {
@@ -42,12 +50,17 @@ class BackendAuthService implements AuthService {
       };
     }
 
+    const u = result.data.user;
     return {
       ok: true,
       user: {
-        email: result.data.user?.email ?? email,
-        name: result.data.user?.name,
-        role: result.data.user?.role ?? 'Warehouse Manager',
+        email: u?.login_id ?? u?.email ?? trimmedLogin,
+        loginId: u?.login_id ?? trimmedLogin,
+        name: u?.display_name ?? u?.name,
+        role: u?.role ?? 'WAREHOUSE_USER',
+        plantId: u?.plant_id,
+        plantName: u?.plant_name,
+        plantLocation: u?.plant_location,
         token: result.data.access_token ?? result.data.token,
         isDevMode: false,
       },
@@ -55,7 +68,7 @@ class BackendAuthService implements AuthService {
   }
 
   async signOut(): Promise<void> {
-    // Session cleared in AppContext / AsyncStorage
+    // Session cleared in AppContext / secureStorage
   }
 }
 

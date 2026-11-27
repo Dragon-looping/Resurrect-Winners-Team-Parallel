@@ -40,15 +40,11 @@ export const LoginScreen: React.FC = () => {
     setPasswordError(null);
     setBannerError(null);
 
-    const trimmedEmail = email.trim();
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const trimmedLogin = email.trim().toLowerCase();
     let valid = true;
 
-    if (!trimmedEmail) {
-      setEmailError('Email address is required.');
-      valid = false;
-    } else if (!emailPattern.test(trimmedEmail)) {
-      setEmailError('Enter a valid work email address.');
+    if (!trimmedLogin) {
+      setEmailError('Warehouse login ID is required.');
       valid = false;
     }
 
@@ -61,11 +57,11 @@ export const LoginScreen: React.FC = () => {
 
     setLoading(true);
     try {
-      const result = await signIn(trimmedEmail, password);
+      const result = await signIn(trimmedLogin, password);
       if (!result.ok) {
         setBannerError(
           result.error ??
-            'Incorrect email or password. Verify your credentials and try again.'
+            'Incorrect warehouse login ID or password. Verify your credentials and try again.'
         );
       }
     } finally {
@@ -87,6 +83,9 @@ export const LoginScreen: React.FC = () => {
               style={styles.mobileLogo}
               resizeMode="contain"
             />
+            <Text style={styles.mobileTagline}>
+              ENTERPRISE INVENTORY NETWORK
+            </Text>
           </View>
         )}
 
@@ -142,20 +141,20 @@ export const LoginScreen: React.FC = () => {
             )}
 
             <View style={styles.form}>
-              {/* Email Address */}
+              {/* Warehouse Login ID */}
               <View style={styles.fieldGroup}>
-                <Text style={styles.label}>Email address</Text>
+                <Text style={styles.label}>Warehouse login ID</Text>
                 <TextInput
                   value={email}
                   onChangeText={setEmail}
-                  placeholder="Enter your work email"
+                  placeholder="e.g. wh-mangaluru, wh-udupi, wh-manipal"
                   placeholderTextColor={Colors.onSurfaceVariant}
-                  keyboardType="email-address"
+                  keyboardType="default"
                   autoCapitalize="none"
                   autoCorrect={false}
-                  autoComplete="email"
+                  autoComplete="username"
                   editable={!loading}
-                  accessibilityLabel="Email address"
+                  accessibilityLabel="Warehouse login ID"
                   style={[
                     styles.input,
                     emailError ? styles.inputError : undefined,
@@ -259,11 +258,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.outlineVariant,
     paddingHorizontal: Spacing.pageMargin,
-    paddingVertical: Spacing.gutterMd,
+    paddingVertical: 18,
+    alignItems: 'center',
+    gap: 6,
   },
   mobileLogo: {
-    width: 150,
-    height: 34,
+    width: 196,
+    height: 32,
+  },
+  mobileTagline: {
+    fontFamily: FontFamily.mono,
+    fontSize: 10,
+    letterSpacing: 1.4,
+    color: Colors.surfaceDim,
   },
   desktopAside: {
     flex: 1,
@@ -274,8 +281,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   desktopLogo: {
-    width: 172,
-    height: 38,
+    width: 220,
+    height: 36,
   },
   asideCenter: {
     gap: Spacing.gutterXl,

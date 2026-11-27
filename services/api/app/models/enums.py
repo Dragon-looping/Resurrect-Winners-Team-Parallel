@@ -128,3 +128,22 @@ class EmailDeliveryStatus(StrEnum):
     SENT = "SENT"
     FAILED = "FAILED"
     SIMULATED_UNCONFIGURED = "SIMULATED_UNCONFIGURED"
+
+
+class WarehouseUserRole(StrEnum):
+    """Roles for authenticated warehouse accounts."""
+
+    WAREHOUSE_USER = "WAREHOUSE_USER"
+
+
+class InterWarehouseRequestStatus(StrEnum):
+    """Lifecycle states for inter-warehouse stock requests."""
+
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    PARTIALLY_APPROVED = "PARTIALLY_APPROVED"
+    REJECTED = "REJECTED"
+    DISPATCHED = "DISPATCHED"
+    PARTIALLY_FULFILLED = "PARTIALLY_FULFILLED"
+    FULFILLED = "FULFILLED"
+    CANCELLED = "CANCELLED"

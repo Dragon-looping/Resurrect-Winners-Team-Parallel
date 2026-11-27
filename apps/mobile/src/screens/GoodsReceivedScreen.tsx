@@ -40,10 +40,10 @@ export const GoodsReceivedScreen: React.FC = () => {
   const [qty, setQty] = useState<number>(
     editingEvent && editingEvent.operation === 'goods_received'
       ? Math.max(1, Math.abs(editingEvent.qtyDelta))
-      : 240
+      : 50
   );
   const [poNumber, setPoNumber] = useState(
-    editingEvent?.referenceValue ?? 'PO-2026-88412'
+    editingEvent?.referenceValue ?? ''
   );
   const [targetBin, setTargetBin] = useState(
     editingEvent?.destinationOrBin ?? activeSku.bin

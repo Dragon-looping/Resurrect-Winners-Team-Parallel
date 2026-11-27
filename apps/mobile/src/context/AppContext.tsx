@@ -10,8 +10,18 @@ import {
   ScreenName,
   SkuItem,
 } from '../types/inventory';
-import { SEED_EVENTS, SEED_INBOUND_SHIPMENTS, SEED_PLANTS, SEED_SKUS } from '../data/seedFixtures';
+import {
+  DEMO_EVENTS,
+  DEMO_INBOUND_SHIPMENTS,
+  DEMO_PLANTS,
+  DEMO_SKUS,
+} from '../data/demoData';
 import { authService, AuthResult } from '../services/authService';
+import {
+  clearAuthSession,
+  loadAuthSession,
+  saveAuthSession,
+} from '../services/secureStorage';
 import { isApiConfigured, isDevModeEnabled } from '../services/config';
 import {
   formatIstTime,
@@ -63,7 +73,7 @@ interface AppContextValue {
   heartbeatIst: string;
   isSyncingLiveData: boolean;
   liveDataError: string | null;
-  dataSourceMode: 'seed' | 'cached' | 'live';
+  dataSourceMode: 'demo' | 'cached' | 'live';
   feedHealth: FeedHealthSummary | null;
   eventsPagination: {
     total: number;
@@ -74,6 +84,7 @@ interface AppContextValue {
 
   plants: Plant[];
   activePlant: Plant;
+  isPlantLocked: boolean;
   skus: SkuItem[];
   plantSkus: SkuItem[];
   activeSku: SkuItem;
@@ -107,14 +118,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [user, setUser] = useState<AuthUser | null>(null);
   const [currentScreen, setCurrentScreen] = useState<ScreenName>('Login');
   const [screenHistory, setScreenHistory] = useState<ScreenName[]>([]);
-  const [selectedEventId, setSelectedEventId] = useState<string>('EVT-2026-9041');
+  const [selectedEventId, setSelectedEventId] = useState<string>(DEMO_EVENTS[0].eventId);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [isOffline, setIsOffline] = useState<boolean>(!isApiConfigured());
   const [lastSyncIst, setLastSyncIst] = useState<string>('14:18 IST');
   const [heartbeatIst, setHeartbeatIst] = useState<string>('14:24 IST');
   const [isSyncingLiveData, setIsSyncingLiveData] = useState<boolean>(false);
   const [liveDataError, setLiveDataError] = useState<string | null>(null);
-  const [dataSourceMode, setDataSourceMode] = useState<'seed' | 'cached' | 'live'>('seed');
+  const [dataSourceMode, setDataSourceMode] = useState<'demo' | 'cached' | 'live'>('demo');
   const [feedHealth, setFeedHealth] = useState<FeedHealthSummary | null>(null);
   const [eventsPagination, setEventsPagination] = useState({
     total: 0,
@@ -123,12 +134,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     hasMore: false,
   });
 
-  const [plants, setPlants] = useState<Plant[]>(SEED_PLANTS);
-  const [activePlantId, setActivePlantId] = useState<string>('PLT-MGL');
-  const [skus, setSkus] = useState<SkuItem[]>(SEED_SKUS);
-  const [activeSkuId, setActiveSkuId] = useState<string>('SKU-MTR-402');
-  const [inboundShipments] = useState<InboundShipment[]>(SEED_INBOUND_SHIPMENTS);
-  const [events, setEvents] = useState<InventoryEvent[]>(SEED_EVENTS);
+  const [plants, setPlants] = useState<Plant[]>(DEMO_PLANTS);
+  const [activePlantId, setActivePlantId] = useState<string>(DEMO_PLANTS[0].id);
+  const [skus, setSkus] = useState<SkuItem[]>(DEMO_SKUS);
+  const [activeSkuId, setActiveSkuId] = useState<string>(DEMO_SKUS[0].id);
+  const [inboundShipments] = useState<InboundShipment[]>(DEMO_INBOUND_SHIPMENTS);
+  const [events, setEvents] = useState<InventoryEvent[]>(DEMO_EVENTS);
 
   // Hydrate persisted state on mount
   useEffect(() => {
@@ -142,7 +153,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           savedFeedHealth,
           savedPlant,
           savedSku,
-          savedUser,
+          savedSecureUser,
+          savedLegacyUser,
         ] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.events),
           AsyncStorage.getItem(STORAGE_KEYS.plants),
@@ -150,8 +162,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           AsyncStorage.getItem(STORAGE_KEYS.feedHealth),
           AsyncStorage.getItem(STORAGE_KEYS.activePlant),
           AsyncStorage.getItem(STORAGE_KEYS.activeSku),
+          loadAuthSession().catch(() => null),
           AsyncStorage.getItem(STORAGE_KEYS.authUser),
         ]);
+        const savedUser = savedSecureUser ?? savedLegacyUser;
         if (!mounted) return;
         if (savedEvents) setEvents(JSON.parse(savedEvents));
         if (savedPlants) setPlants(JSON.parse(savedPlants));
@@ -187,12 +201,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [events, isHydrated]);
 
   useEffect(() => {
-    if (!isHydrated) return;
+    if (!isHydrated || dataSourceMode === 'demo') return;
     AsyncStorage.setItem(STORAGE_KEYS.skus, JSON.stringify(skus)).catch(() => {});
-  }, [skus, isHydrated]);
+  }, [skus, isHydrated, dataSourceMode]);
 
   const activePlant = useMemo(
-    () => plants.find((p) => p.id === activePlantId) ?? plants[0] ?? SEED_PLANTS[0],
+    () => plants.find((p) => p.id === activePlantId) ?? plants[0] ?? DEMO_PLANTS[0],
     [plants, activePlantId]
   );
 
@@ -202,7 +216,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 
   const activeSku = useMemo(
-    () => plantSkus.find((s) => s.id === activeSkuId) ?? plantSkus[0] ?? skus[0] ?? SEED_SKUS[0],
+    () => plantSkus.find((s) => s.id === activeSkuId) ?? plantSkus[0] ?? skus[0] ?? DEMO_SKUS[0],
     [plantSkus, activeSkuId, skus]
   );
 
@@ -247,8 +261,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, [user]);
 
+  const isPlantLocked = Boolean(user && !user.isDevMode && user.plantId);
+
   const selectPlant = useCallback(
     (plantId: string) => {
+      if (isPlantLocked) return;
       setActivePlantId(plantId);
       AsyncStorage.setItem(STORAGE_KEYS.activePlant, plantId).catch(() => {});
       const firstForPlant = skus.find((s) => s.plantId === plantId);
@@ -257,7 +274,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         AsyncStorage.setItem(STORAGE_KEYS.activeSku, firstForPlant.id).catch(() => {});
       }
     },
-    [skus]
+    [skus, isPlantLocked]
   );
 
   const selectSku = useCallback((skuId: string) => {
@@ -276,11 +293,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, []);
 
-  const signIn = useCallback(async (email: string, password: string): Promise<AuthResult> => {
-    const result = await authService.signIn(email, password);
+  const signIn = useCallback(async (loginId: string, password: string): Promise<AuthResult> => {
+    const result = await authService.signIn(loginId, password);
     if (result.ok && result.user) {
-      setUser(result.user);
-      await AsyncStorage.setItem(STORAGE_KEYS.authUser, JSON.stringify(result.user)).catch(() => {});
+      const authenticatedUser = result.user;
+      setUser(authenticatedUser);
+      await saveAuthSession(JSON.stringify(authenticatedUser)).catch(() => {});
+      if (authenticatedUser.plantId) {
+        const assignedPlantId = `PLT-${authenticatedUser.plantId}`;
+        setPlants((prev) => {
+          const match = prev.find((p) => p.backendId === authenticatedUser.plantId);
+          if (match) {
+            setActivePlantId(match.id);
+            return prev;
+          }
+          const newPlant: Plant = {
+            id: assignedPlantId,
+            backendId: authenticatedUser.plantId!,
+            name: authenticatedUser.plantName ?? `Warehouse ${authenticatedUser.plantId}`,
+            godownLabel: authenticatedUser.plantLocation ?? 'Assigned Warehouse',
+            sublabel: `${authenticatedUser.plantLocation ?? 'Assigned Warehouse'} · ${authenticatedUser.loginId ?? ''}`,
+          };
+          setActivePlantId(newPlant.id);
+          return [newPlant];
+        });
+      }
       setScreenHistory([]);
       setCurrentScreen('Dashboard');
     }
@@ -296,7 +333,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isDevMode: true,
     };
     setUser(devUser);
-    await AsyncStorage.setItem(STORAGE_KEYS.authUser, JSON.stringify(devUser)).catch(() => {});
+    await saveAuthSession(JSON.stringify(devUser)).catch(() => {});
     setScreenHistory([]);
     setCurrentScreen('Dashboard');
   }, []);
@@ -304,6 +341,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const signOut = useCallback(async () => {
     await authService.signOut();
     setUser(null);
+    await clearAuthSession().catch(() => {});
     await AsyncStorage.removeItem(STORAGE_KEYS.authUser).catch(() => {});
     setScreenHistory([]);
     setCurrentScreen('Login');
@@ -594,6 +632,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     eventsPagination,
     plants,
     activePlant,
+    isPlantLocked,
     skus,
     plantSkus,
     activeSku,

@@ -5,7 +5,11 @@ import {
   setPlannerConfig,
   resetPlannerFixtures
 } from '../adapters/plannerAdapter.ts';
-import { PlannerOrder } from '../types/planner.ts';
+import {
+  PlannerIntakeRequest,
+  PlannerOrder
+} from '../types/planner.ts';
+import { OrderQueuePanel } from '../components/OrderQueuePanel.tsx';
 import { AlertIcon, RotateCcwIcon } from '../../shared/icons.tsx';
 
 interface PlannerWorkspacePageProps {
@@ -51,6 +55,17 @@ export const PlannerWorkspacePage: React.FC<PlannerWorkspacePageProps> = ({
     resetPlannerFixtures();
     onNavigate('/planner/orders/ORD-2026-MANIPAL-50');
     loadWorkspace();
+  };
+
+  const handleCreateOrder = async (req: PlannerIntakeRequest) => {
+    setError(null);
+    try {
+      const created = await getPlannerAdapter().createPlannerOrder(req);
+      await loadWorkspace();
+      onNavigate(`/planner/orders/${created.orderId}`);
+    } catch (err: any) {
+      setError(err.message || 'Failed to create planner order.');
+    }
   };
 
   return (
@@ -113,11 +128,20 @@ export const PlannerWorkspacePage: React.FC<PlannerWorkspacePageProps> = ({
         </div>
       )}
 
-      <div className="ruled-box" style={{ padding: '1.25rem' }}>
-        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--ink-muted)' }}>
-          Loaded {orders.length} outstanding orders. Active: {activeOrder?.orderId || 'None'}.
-        </p>
-      </div>
+      <OrderQueuePanel
+        orders={orders}
+        activeOrderId={orderId}
+        onSelectOrder={id => onNavigate(`/planner/orders/${id}`)}
+        onCreateOrder={handleCreateOrder}
+      />
+
+      {activeOrder && (
+        <div className="ruled-box" style={{ padding: '1.25rem' }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--ink-muted)' }}>
+            Inspecting {activeOrder.orderId} ({activeOrder.quantity} {activeOrder.unitLabel} · {activeOrder.itemSku} → {activeOrder.destination}).
+          </p>
+        </div>
+      )}
     </div>
   );
 };

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { CustomerOrder } from '../types/order.ts';
 import { getOrderAdapter } from '../adapters/orderAdapter.ts';
 import { ClarificationCard } from '../components/ClarificationCard.tsx';
-import { AlertIcon, ClockIcon } from '../../shared/icons.tsx';
+import { OrderStatusBadge, OrderSummarySideCard } from '../components/OrderStatusHeader.tsx';
+import { AlertIcon, ClockIcon, RefreshIcon } from '../../shared/icons.tsx';
 
 interface OrderPortalPageProps {
   orderId: string;
@@ -14,9 +15,12 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState(false);
 
-  const fetchOrder = useCallback(async () => {
-    setIsLoading(true);
+  const fetchOrder = useCallback(async (showRefreshingState = false) => {
+    if (showRefreshingState) setIsRefreshing(true);
+    else setIsLoading(true);
     setError(null);
     try {
       const adapter = getOrderAdapter();
@@ -26,6 +30,7 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
       setError(err.message || `Failed to fetch order ${orderId}`);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, [orderId]);
 
@@ -51,10 +56,18 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
     }
   };
 
+  const handleCopyLink = () => {
+    const url = window.location.href;
+    navigator.clipboard?.writeText(url).then(() => {
+      setCopyFeedback(true);
+      setTimeout(() => setCopyFeedback(false), 2000);
+    }).catch(() => {});
+  };
+
   if (isLoading) {
     return (
-      <div className="ruled-box" style={{ padding: '3rem', textAlign: 'center', background: 'var(--surface)' }}>
-        <ClockIcon size={28} color="var(--ink-muted)" />
+      <div className="ruled-box" style={{ padding: '3.5rem 1.5rem', textAlign: 'center', background: 'var(--surface)' }}>
+        <ClockIcon size={32} color="var(--ink-muted)" />
         <p style={{ marginTop: '1rem', color: 'var(--ink-secondary)', fontFamily: 'var(--font-mono)' }}>
           Retrieving logistics manifest for {orderId}...
         </p>
@@ -75,7 +88,7 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
           {error || `Order ${orderId} could not be located in current dispatch state.`}
         </p>
         <div style={{ display: 'flex', gap: '1rem' }}>
-          <button className="btn-primary" onClick={fetchOrder}>
+          <button className="btn-primary" onClick={() => fetchOrder()}>
             Retry Fetch
           </button>
           <button className="btn-secondary" onClick={() => onNavigate('/customer/request')}>
@@ -86,10 +99,99 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
     );
   }
 
+  // Determine state-based heading & subtext
+  let pageHeading = 'Review delivery manifest';
+  let pageSubtext = 'Authoritative logistics record from the Udupi dispatch hub.';
+
+  if (order.status === 'clarifying') {
+    pageHeading = 'Resolve delivery ambiguity';
+    pageSubtext = 'Please clarify timing specifications to enable automated allocation.';
+  } else if (order.status === 'offer_issued') {
+    pageHeading = 'Choose a delivery schedule';
+    pageSubtext = 'Udupi warehouse reconciliation updated. Review proposed shipment options below.';
+  } else if (order.status === 'recovery_pending') {
+    pageHeading = 'Checking recovery for 50 units by Friday';
+    pageSubtext = 'Original terms recorded. Scanning inter-depot transfers and buffer stock.';
+  } else if (order.status === 'confirmed') {
+    pageHeading = 'Authoritative schedule confirmed';
+    pageSubtext = 'Shipment allocations locked with carrier dispatches staged.';
+  } else if (order.status === 'unavoidable_delay') {
+    pageHeading = 'Partial delivery scheduled · Balance delayed';
+    pageSubtext = 'Available stock staged for transport; remaining units scheduled on earliest buffer arrival.';
+  } else if (order.status === 'expired') {
+    pageHeading = 'Offer proposal expired';
+    pageSubtext = 'The 30-minute allocation reservation expired. Refresh to obtain current stock schedules.';
+  }
+
   return (
     <div className="dispatch-grid">
       <div>
-        {/* If in clarifying state, display inline clarification card */}
+        {/* Top order meta banner */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem', borderBottom: '1px solid var(--rule)', paddingBottom: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', fontWeight: 600, color: 'var(--ink)' }}>
+              MANIFEST #{order.orderId}
+            </span>
+            <OrderStatusBadge status={order.status} />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button
+              onClick={handleCopyLink}
+              style={{
+                fontSize: '0.75rem',
+                fontFamily: 'var(--font-mono)',
+                padding: '0.25rem 0.5rem',
+                border: '1px solid var(--rule)',
+                background: 'var(--surface)',
+                color: copyFeedback ? 'var(--forest-green)' : 'var(--ink-secondary)'
+              }}
+              title="Copy direct link to this order"
+            >
+              {copyFeedback ? 'LINK COPIED' : 'COPY DIRECT LINK'}
+            </button>
+
+            <button
+              onClick={() => fetchOrder(true)}
+              disabled={isRefreshing}
+              style={{
+                fontSize: '0.75rem',
+                fontFamily: 'var(--font-mono)',
+                padding: '0.25rem 0.5rem',
+                border: '1px solid var(--rule)',
+                background: 'var(--surface)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                color: 'var(--ink-secondary)'
+              }}
+              title="Refresh order state from authoritative backend"
+            >
+              <RefreshIcon size={12} />
+              <span>{isRefreshing ? 'REFRESHING...' : 'REFRESH'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Dynamic State Headline */}
+        <div style={{ marginBottom: '1.75rem' }}>
+          <h1 style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: '2.5rem',
+            fontWeight: 700,
+            letterSpacing: '0.02em',
+            lineHeight: 1.1,
+            textTransform: 'uppercase',
+            color: 'var(--ink)'
+          }}>
+            {pageHeading}
+          </h1>
+          <p style={{ marginTop: '0.5rem', color: 'var(--ink-secondary)', fontSize: '1.05rem' }}>
+            {pageSubtext}
+          </p>
+        </div>
+
+        {/* Content Area Based on Status */}
         {order.status === 'clarifying' && order.clarificationPrompt ? (
           <ClarificationCard
             order={order}
@@ -98,51 +200,16 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
             isSubmitting={isSubmitting}
           />
         ) : (
-          <div>
-            <div style={{ marginBottom: '1.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--ink-muted)', textTransform: 'uppercase' }}>
-                  Order {order.orderId} · Version {order.version}
-                </span>
-              </div>
-              <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', fontWeight: 700, letterSpacing: '0.02em', lineHeight: 1.1, textTransform: 'uppercase' }}>
-                Delivery Manifest Review
-              </h1>
-            </div>
-
-            <div className="ruled-box" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
-              <p style={{ fontSize: '0.9rem', color: 'var(--ink-muted)' }}>
-                Order status: <strong>{order.status}</strong>
-              </p>
-            </div>
+          <div className="ruled-box" style={{ padding: '1.5rem', background: 'var(--surface)' }}>
+            <p style={{ fontSize: '0.9rem', color: 'var(--ink-muted)' }}>
+              Order State: <strong>{order.status}</strong> · Active Offer: {order.activeOffer ? order.activeOffer.offerId : 'None'}
+            </p>
           </div>
         )}
       </div>
 
-      <aside>
-        <div className="ruled-box" style={{ padding: '1.25rem' }}>
-          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', textTransform: 'uppercase', marginBottom: '0.75rem', borderBottom: '1px solid var(--rule)', paddingBottom: '0.5rem' }}>
-            Original Request
-          </h3>
-          <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.5rem 1rem', fontSize: '0.875rem' }}>
-            <dt style={{ color: 'var(--ink-muted)' }}>Item</dt>
-            <dd style={{ fontWeight: 500 }}>{order.requestedDetails.itemName}</dd>
-            <dt style={{ color: 'var(--ink-muted)' }}>Quantity</dt>
-            <dd className="tabular" style={{ fontWeight: 600 }}>{order.requestedDetails.quantity} units</dd>
-            <dt style={{ color: 'var(--ink-muted)' }}>Destination</dt>
-            <dd>{order.requestedDetails.destination}</dd>
-            <dt style={{ color: 'var(--ink-muted)' }}>Requested</dt>
-            <dd className="tabular">{order.requestedDetails.requestedArrivalDate}</dd>
-            <dt style={{ color: 'var(--ink-muted)' }}>Single Load</dt>
-            <dd>{order.requestedDetails.mustArriveTogether ? 'Required' : 'Flexible'}</dd>
-          </dl>
-          <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--rule)' }}>
-            <button className="btn-secondary" style={{ width: '100%' }} onClick={() => onNavigate('/customer/request')}>
-              New Delivery Request
-            </button>
-          </div>
-        </div>
-      </aside>
+      {/* Right Column: Original Promise and Tally Summary */}
+      <OrderSummarySideCard order={order} onNavigate={onNavigate} />
     </div>
   );
 };

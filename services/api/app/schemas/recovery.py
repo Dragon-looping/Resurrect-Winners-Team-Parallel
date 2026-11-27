@@ -123,3 +123,9 @@ class RecoveryAuditLogResponse(BaseModel):
     actor: str
     details: dict[str, Any]
     created_at: datetime
+
+
+class RecoveryApproveRequest(BaseModel):
+    """Optional approval metadata for POST /recovery/swaps/{id}/approve."""
+
+    actor: str = Field(default="operator", min_length=1, max_length=100)

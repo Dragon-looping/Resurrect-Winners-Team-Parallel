@@ -6,11 +6,13 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.fulfilment.orders import OrderError
 from app.fulfilment.recovery.service import (
+    approve_recovery_plan,
     get_recovery_plan,
     preview_recovery_swap,
     search_recovery_options,
 )
 from app.schemas.recovery import (
+    RecoveryApproveRequest,
     RecoveryPlanResponse,
     RecoveryPreviewRequest,
     RecoverySearchRequest,
@@ -56,6 +58,26 @@ def post_recovery_preview(
     return RecoveryPlanResponse.model_validate(plan)
 
 
+@router.post(
+    "/recovery/swaps/{recovery_id}/approve",
+    response_model=RecoveryPlanResponse,
+    summary="Approve and execute a recovery plan",
+    description="Revalidates versions and feasibility, then atomically commits both orders' allocation changes.",
+)
+def post_recovery_approve(
+    recovery_id: int,
+    payload: RecoveryApproveRequest | None = None,
+    db: Session = Depends(get_db),
+) -> RecoveryPlanResponse:
+    """Approve and execute a recovery plan transactionally."""
+    actor = payload.actor if payload is not None else "operator"
+    try:
+        plan = approve_recovery_plan(db, recovery_id, actor=actor)
+    except OrderError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
+    return RecoveryPlanResponse.model_validate(plan)
+
+
 @router.get(
     "/recovery/{recovery_id}",
     response_model=RecoveryPlanResponse,
@@ -69,6 +91,26 @@ def get_recovery_by_id(
     """Fetch a recovery plan by ID."""
     try:
         plan = get_recovery_plan(db, recovery_id)
+    except OrderError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
+    return RecoveryPlanResponse.model_validate(plan)
+
+
+@router.post(
+    "/recovery/swaps/{recovery_id}/approve",
+    response_model=RecoveryPlanResponse,
+    summary="Approve and execute a recovery plan",
+    description="Revalidates versions and feasibility, then atomically commits both orders' allocation changes.",
+)
+def post_recovery_approve(
+    recovery_id: int,
+    payload: RecoveryApproveRequest | None = None,
+    db: Session = Depends(get_db),
+) -> RecoveryPlanResponse:
+    """Approve and execute a recovery plan transactionally."""
+    actor = payload.actor if payload is not None else "operator"
+    try:
+        plan = approve_recovery_plan(db, recovery_id, actor=actor)
     except OrderError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
     return RecoveryPlanResponse.model_validate(plan)

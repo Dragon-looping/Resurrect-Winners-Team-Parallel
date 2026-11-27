@@ -3,12 +3,12 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.fulfilment.production import get_projected_production_supply
 from app.inventory.engine import calculate_stock_snapshot, normalize_utc
-from app.models import InventoryBalance, InventoryEvent, Plant
+from app.models import InventoryEvent, Plant
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,13 +60,12 @@ def discover_godown_stock(
             validate_rules=False,
         )
         prod_supply = get_projected_production_supply(db, plant.id, sku_id, target_dt)
-        bal = db.execute(
-            select(InventoryBalance).where(
-                InventoryBalance.plant_id == plant.id,
-                InventoryBalance.sku_id == sku_id,
+        stock_version = db.execute(
+            select(func.coalesce(func.max(InventoryEvent.id), 0)).where(
+                InventoryEvent.plant_id == plant.id,
+                InventoryEvent.sku_id == sku_id,
             )
-        ).scalar_one_or_none()
-        stock_version = (bal.last_event_id or 0) if bal is not None else 0
+        ).scalar_one()
 
         results.append(
             GodownStockView(

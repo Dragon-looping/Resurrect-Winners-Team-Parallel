@@ -19,6 +19,7 @@ import { CutoffChallengePanel } from '../components/CutoffChallengePanel.tsx';
 import { OptionComparisonTable } from '../components/OptionComparisonTable.tsx';
 import { RecoveryApprovalPanel } from '../components/RecoveryApprovalPanel.tsx';
 import { HistoricalCasePanel } from '../components/HistoricalCasePanel.tsx';
+import { PurchasingReviewPanel } from '../components/PurchasingReviewPanel.tsx';
 import { AlertIcon, RotateCcwIcon } from '../../shared/icons.tsx';
 
 interface PlannerWorkspacePageProps {
@@ -217,6 +218,11 @@ export const PlannerWorkspacePage: React.FC<PlannerWorkspacePageProps> = ({
             onError={msg => setError(msg)}
           />
           <HistoricalCasePanel order={activeOrder} />
+          <PurchasingReviewPanel
+            order={activeOrder}
+            onActionComplete={loadWorkspace}
+            onError={msg => setError(msg)}
+          />
         </>
       )}
     </div>

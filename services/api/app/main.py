@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 
 from app.core.config import get_settings
-from app.routes import events_router, health_router
+from app.routes import events_router, health_router, inventory_router
 
 
 def create_app() -> FastAPI:
@@ -21,6 +21,7 @@ def create_app() -> FastAPI:
 
     application.include_router(health_router)
     application.include_router(events_router)
+    application.include_router(inventory_router)
     return application
 
 

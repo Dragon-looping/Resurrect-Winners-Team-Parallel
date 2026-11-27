@@ -8,6 +8,7 @@ from app.schemas.event import (
     QuarantinedEventResponse,
 )
 from app.schemas.health import HealthResponse
+from app.schemas.replay import ReplayBalanceItem, ReplayResponse
 
 __all__ = [
     "EventIngestionResponse",
@@ -16,4 +17,6 @@ __all__ = [
     "InventoryEventResponse",
     "PaginatedQuarantinedEventsResponse",
     "QuarantinedEventResponse",
+    "ReplayBalanceItem",
+    "ReplayResponse",
 ]

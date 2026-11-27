@@ -93,6 +93,8 @@ export const Layout: React.FC<LayoutProps> = ({
               }}
             >
               PS3 Evaluation
+            </button>
+            <button
               onClick={() => onNavigate && onNavigate('/cases/steering')}
               style={{
                 textDecoration: 'none',

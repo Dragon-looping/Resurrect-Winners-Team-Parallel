@@ -159,3 +159,164 @@ def preview_supplier_email(
         requires_human_confirmation=True,
         previewed_at=now_utc,
     )
+
+
+def _default_smtp_send(cfg: EmailIntegrationConfig, message: EmailMessage) -> str:
+    """Send an EmailMessage synchronously over configured SMTP server."""
+    assert cfg.smtp_host is not None
+    with smtplib.SMTP(cfg.smtp_host, cfg.smtp_port, timeout=10) as client:
+        if cfg.smtp_use_tls:
+            client.starttls()
+        if cfg.smtp_username and cfg.smtp_password:
+            client.login(cfg.smtp_username, cfg.smtp_password)
+        client.send_message(message)
+    return f"smtp-{uuid4().hex[:12]}"
+
+
+def send_confirmed_supplier_email(
+    db: Session,
+    po_id: int,
+    actor: ActorContext,
+    *,
+    human_confirmed: bool,
+    custom_note: str | None = None,
+    email_config: EmailIntegrationConfig | None = None,
+    smtp_sender=None,
+) -> EmailLogResponse:
+    """Send a supplier PO email ONLY after explicit human confirmation."""
+    require_human_approver(actor)
+
+    if not human_confirmed:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Explicit human_confirmed=true is required before dispatching supplier emails.",
+        )
+
+    po, supplier, plant, sku = _load_po_context(db, po_id)
+    if po.status == PurchaseOrderStatus.CANCELLED.value:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot send email for cancelled Purchase Order {po.po_number}.",
+        )
+
+    cfg = email_config or get_email_config()
+    subject, body_text, body_html = _compose_po_email(
+        po, supplier, plant, sku, custom_note=custom_note
+    )
+    now_utc = datetime.now(timezone.utc)
+
+    if not cfg.is_configured:
+        log_entry = SupplierEmailLog(
+            purchase_order_id=po.id,
+            recipient_email=supplier.contact_email,
+            recipient_name=supplier.contact_name,
+            subject=subject,
+            body_text=body_text,
+            body_html=body_html,
+            integration_status="NOT_CONFIGURED",
+            delivery_status=EmailDeliveryStatus.SIMULATED_UNCONFIGURED.value,
+            confirmed_by=actor.actor_id,
+            confirmed_at=now_utc,
+            error_message=(
+                "SMTP credentials (SMTP_HOST / SMTP_FROM_EMAIL) are not configured. "
+                "Email was NOT sent; use the preview to copy or download."
+            ),
+        )
+        db.add(log_entry)
+        record_audit_log(
+            db,
+            entity_type="EMAIL",
+            entity_id=po.po_number,
+            action="EMAIL_SKIPPED_UNCONFIGURED",
+            actor_id=actor.actor_id,
+            actor_role=actor.role.value,
+            details={"recipient_email": supplier.contact_email},
+        )
+        db.commit()
+        db.refresh(log_entry)
+        return EmailLogResponse.model_validate(log_entry, from_attributes=True)
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = cfg.smtp_from_email
+    msg["To"] = supplier.contact_email
+    msg.set_content(body_text)
+    msg.add_alternative(body_html, subtype="html")
+
+    sender_fn = smtp_sender or _default_smtp_send
+    try:
+        message_id = sender_fn(cfg, msg)
+        log_entry = SupplierEmailLog(
+            purchase_order_id=po.id,
+            recipient_email=supplier.contact_email,
+            recipient_name=supplier.contact_name,
+            subject=subject,
+            body_text=body_text,
+            body_html=body_html,
+            integration_status="CONFIGURED",
+            delivery_status=EmailDeliveryStatus.SENT.value,
+            confirmed_by=actor.actor_id,
+            confirmed_at=now_utc,
+            sent_at=datetime.now(timezone.utc),
+            provider_message_id=message_id,
+        )
+        db.add(log_entry)
+        if po.status in {PurchaseOrderStatus.CREATED.value, PurchaseOrderStatus.READY_TO_SEND.value}:
+            po.status = PurchaseOrderStatus.SENT.value
+            po.version += 1
+        record_audit_log(
+            db,
+            entity_type="EMAIL",
+            entity_id=po.po_number,
+            action="EMAIL_SENT",
+            actor_id=actor.actor_id,
+            actor_role=actor.role.value,
+            details={
+                "recipient_email": supplier.contact_email,
+                "provider_message_id": message_id,
+            },
+        )
+        db.commit()
+        db.refresh(log_entry)
+        return EmailLogResponse.model_validate(log_entry, from_attributes=True)
+    except Exception as exc:
+        log_entry = SupplierEmailLog(
+            purchase_order_id=po.id,
+            recipient_email=supplier.contact_email,
+            recipient_name=supplier.contact_name,
+            subject=subject,
+            body_text=body_text,
+            body_html=body_html,
+            integration_status="CONFIGURED",
+            delivery_status=EmailDeliveryStatus.FAILED.value,
+            confirmed_by=actor.actor_id,
+            confirmed_at=now_utc,
+            error_message=str(exc),
+        )
+        db.add(log_entry)
+        record_audit_log(
+            db,
+            entity_type="EMAIL",
+            entity_id=po.po_number,
+            action="EMAIL_FAILED",
+            actor_id=actor.actor_id,
+            actor_role=actor.role.value,
+            details={"recipient_email": supplier.contact_email, "error": str(exc)},
+        )
+        db.commit()
+        db.refresh(log_entry)
+        return EmailLogResponse.model_validate(log_entry, from_attributes=True)
+
+
+def list_email_logs(
+    db: Session,
+    *,
+    po_id: int | None = None,
+) -> list[EmailLogResponse]:
+    """List supplier email delivery logs ordered newest-first."""
+    stmt = select(SupplierEmailLog)
+    if po_id is not None:
+        stmt = stmt.where(SupplierEmailLog.purchase_order_id == po_id)
+    stmt = stmt.order_by(SupplierEmailLog.created_at.desc(), SupplierEmailLog.id.desc())
+    rows = list(db.execute(stmt).scalars().all())
+    return [EmailLogResponse.model_validate(r, from_attributes=True) for r in rows]

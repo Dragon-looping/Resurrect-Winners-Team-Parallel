@@ -3,6 +3,7 @@ import { Layout } from './shared/Layout.tsx';
 import { IntakePage } from './customer/pages/IntakePage.tsx';
 import { OrderPortalPage } from './customer/pages/OrderPortalPage.tsx';
 import { PlannerWorkspacePage } from './planner/pages/PlannerWorkspacePage.tsx';
+import { EvaluationWorkspacePage } from './evaluation/pages/EvaluationWorkspacePage.tsx';
 
 export const App: React.FC = () => {
   const [currentPath, setCurrentPath] = useState<string>(() => {
@@ -34,7 +35,9 @@ export const App: React.FC = () => {
   let content = null;
   let orderRef = undefined;
 
-  if (currentPath.startsWith('/planner')) {
+  if (currentPath.startsWith('/evaluation') || currentPath.startsWith('/eval')) {
+    content = <EvaluationWorkspacePage />;
+  } else if (currentPath.startsWith('/planner')) {
     const id = currentPath.startsWith('/planner/orders/')
       ? currentPath.replace('/planner/orders/', '').split(/[?#]/)[0] || 'ORD-2026-MANIPAL-50'
       : 'ORD-2026-MANIPAL-50';

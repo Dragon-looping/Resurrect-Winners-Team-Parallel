@@ -106,9 +106,9 @@ export const InventoryEventHistoryScreen: React.FC = () => {
           {/* Ledger Header & Retry All Action */}
           <View style={styles.headerCard}>
             <View style={styles.headerInfo}>
-              <Text style={styles.headlineMd}>Event History</Text>
+              <Text style={styles.headlineMd}>Movements</Text>
               <Text style={styles.monoSub}>
-                {activePlant.id} · Last sync {lastSyncIst}
+                {activePlant.name} · Last sync {lastSyncIst}
               </Text>
             </View>
             <Pressable
@@ -192,14 +192,14 @@ export const InventoryEventHistoryScreen: React.FC = () => {
           {/* Compact Operational Ledger */}
           <View style={styles.ledgerCard}>
             <View style={styles.ledgerSectionHeader}>
-              <Text style={styles.eyebrow}>Today · 27 Nov 2026</Text>
-              <Text style={styles.monoSub}>Stable Event IDs</Text>
+              <Text style={styles.eyebrow}>LEDGER</Text>
+              <Text style={styles.monoSub}>{filteredEvents.length} records</Text>
             </View>
 
             {filteredEvents.length === 0 ? (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyText}>
-                  No inventory events match this filter.
+                  No movements recorded.
                 </Text>
               </View>
             ) : (
@@ -210,11 +210,19 @@ export const InventoryEventHistoryScreen: React.FC = () => {
                   : evt.status === 'pending'
                     ? 'warning'
                     : 'success';
-                const badgeLabel = isFailed
-                  ? 'Retry'
-                  : evt.status === 'pending'
-                    ? 'Pending'
-                    : 'Submitted';
+                const badgeLabel = evt.isDemo
+                  ? 'Demo Data'
+                  : isFailed
+                    ? 'Sync Failed'
+                    : evt.status === 'pending'
+                      ? 'Action Pending'
+                      : 'Synced';
+                const operationDescription =
+                  evt.operation === 'goods_received'
+                    ? 'Goods Received'
+                    : evt.operation === 'goods_dispatch'
+                      ? 'Stock Dispatched'
+                      : 'Physical Stock Corrected';
                 const deltaPrefix = evt.qtyDelta > 0 ? '+' : '';
                 const isLast = index === filteredEvents.length - 1;
 
@@ -242,18 +250,35 @@ export const InventoryEventHistoryScreen: React.FC = () => {
                           {evt.eventId}
                         </Text>
                         <Text style={styles.eventTitle} numberOfLines={1}>
-                          {evt.operationLabel}
+                          {operationDescription}
                         </Text>
                       </View>
                       <Text style={styles.monoSub} numberOfLines={1}>
                         {evt.skuName} ({evt.skuId}) · {deltaPrefix}
-                        {evt.qtyDelta} EA · {evt.timestampIst} ·{' '}
-                        {evt.isDemo ? 'DEMO DATA' : evt.serverConfirmed ? 'Server' : 'Local'}
+                        {evt.qtyDelta} units · {evt.plantName} · {evt.timestampIst}
                       </Text>
                     </View>
 
                     <View style={styles.eventRight}>
-                      <StatusBadge label={badgeLabel} variant={badgeVariant} />
+                      <View style={{ alignItems: 'flex-end', gap: 3 }}>
+                        <Text
+                          style={[
+                            styles.qtyDeltaText,
+                            {
+                              color:
+                                evt.qtyDelta > 0
+                                  ? Colors.primary
+                                  : isFailed
+                                    ? Colors.error
+                                    : Colors.onSurface,
+                            },
+                          ]}
+                        >
+                          {deltaPrefix}
+                          {evt.qtyDelta}
+                        </Text>
+                        <StatusBadge label={badgeLabel} variant={badgeVariant} />
+                      </View>
                       <MaterialIcons
                         name="chevron-right"
                         size={18}
@@ -457,6 +482,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.gutterXs,
+  },
+  qtyDeltaText: {
+    fontFamily: FontFamily.monoSemiBold,
+    fontSize: 13,
+    fontVariant: ['tabular-nums'],
   },
   emptyState: {
     padding: Spacing.gutterXl,

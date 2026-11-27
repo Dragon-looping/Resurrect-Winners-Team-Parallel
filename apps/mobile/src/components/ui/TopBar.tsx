@@ -18,10 +18,10 @@ export const MainTopBar: React.FC = () => {
   } = useApp();
 
   const badgeLabel = isOffline
-    ? `Offline · ${pendingAndFailedCount} Pending`
+    ? `Offline (${pendingAndFailedCount} Pending)`
     : pendingAndFailedCount > 0
-      ? `Online · ${pendingAndFailedCount} Pending`
-      : 'Online · Synced';
+      ? `Action Pending (${pendingAndFailedCount})`
+      : 'Synced';
 
   const badgeVariant: BadgeVariant = isOffline
     ? 'warning'

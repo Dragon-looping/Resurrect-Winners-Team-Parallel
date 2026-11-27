@@ -26,7 +26,10 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "pretest": "node -e \"require('fs').rmSync('.tmp-test',{recursive:true,force:true})\" && npx tsc -p tsconfig.test.json",
+    "test": "node --test test/eventService.test.mjs test/inventoryService.test.mjs",
+    "posttest": "node -e \"require('fs').rmSync('.tmp-test',{recursive:true,force:true})\""
   },
   "private": true
 }

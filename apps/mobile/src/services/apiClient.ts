@@ -30,6 +30,18 @@ export interface RequestOptions {
 }
 
 const DEFAULT_TIMEOUT_MS = 8000;
+let loggedResolvedBaseUrl: string | null = null;
+
+function isDevDiagnosticsEnabled(): boolean {
+  return typeof __DEV__ !== 'undefined' && __DEV__;
+}
+
+function formatErrorSummary(err: unknown): string {
+  if (err instanceof Error) {
+    return `${err.name}: ${err.message}`;
+  }
+  return String(err);
+}
 
 function parseFastApiError(status: number, body: unknown): ApiError {
   if (status === 401 || status === 403) {
@@ -97,7 +109,19 @@ export async function apiRequest<T>(
   options: RequestOptions = {}
 ): Promise<ApiResult<T>> {
   const baseUrl = getApiBaseUrl();
+  const method = options.method ?? 'GET';
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const requestUrl = `${baseUrl}${normalizedPath}`;
+
+  if (isDevDiagnosticsEnabled() && loggedResolvedBaseUrl !== baseUrl) {
+    loggedResolvedBaseUrl = baseUrl;
+    console.info(`[apiClient] Resolved API base URL: ${baseUrl || '(empty)'}`);
+  }
+
   if (!baseUrl) {
+    if (isDevDiagnosticsEnabled()) {
+      console.warn(`[apiClient] ${method} ${normalizedPath} aborted: EXPO_PUBLIC_API_BASE_URL is empty`);
+    }
     return {
       ok: false,
       error: {
@@ -108,7 +132,6 @@ export async function apiRequest<T>(
     };
   }
 
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   const controller = new AbortController();
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -123,8 +146,8 @@ export async function apiRequest<T>(
       headers.Authorization = `Bearer ${options.token}`;
     }
 
-    const response = await fetch(`${baseUrl}${normalizedPath}`, {
-      method: options.method ?? 'GET',
+    const response = await fetch(requestUrl, {
+      method,
       headers,
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
       signal: controller.signal,
@@ -153,6 +176,11 @@ export async function apiRequest<T>(
       data: parsed as T,
     };
   } catch (err) {
+    if (isDevDiagnosticsEnabled()) {
+      console.warn(
+        `[apiClient] Request failed (${method} ${requestUrl}) [baseUrl=${baseUrl}]: ${formatErrorSummary(err)}`
+      );
+    }
     if (err instanceof Error && err.name === 'AbortError') {
       return {
         ok: false,

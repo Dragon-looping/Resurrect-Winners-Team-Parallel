@@ -4,6 +4,7 @@ from app.routes.events import router as events_router
 from app.routes.feeds import router as feeds_router
 from app.routes.health import router as health_router
 from app.routes.inventory import router as inventory_router
+from app.routes.offers import router as offers_router
 from app.routes.orders import router as orders_router
 from app.routes.production import router as production_router
 from app.routes.stock import router as stock_router
@@ -14,6 +15,7 @@ __all__ = [
     "feeds_router",
     "health_router",
     "inventory_router",
+    "offers_router",
     "orders_router",
     "production_router",
     "stock_router",

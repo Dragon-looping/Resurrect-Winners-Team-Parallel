@@ -6,6 +6,7 @@ import {
   resetPlannerFixtures
 } from '../adapters/plannerAdapter.ts';
 import {
+  CutoffPreviewResult,
   PlannerIntakeRequest,
   PlannerOrder,
   TelemetrySnapshot
@@ -14,6 +15,7 @@ import { OrderQueuePanel } from '../components/OrderQueuePanel.tsx';
 import { TelemetryStrip } from '../components/TelemetryStrip.tsx';
 import { PlannerOffersPanel } from '../components/PlannerOffersPanel.tsx';
 import { GodownRouteMap } from '../components/GodownRouteMap.tsx';
+import { CutoffChallengePanel } from '../components/CutoffChallengePanel.tsx';
 import { AlertIcon, RotateCcwIcon } from '../../shared/icons.tsx';
 
 interface PlannerWorkspacePageProps {
@@ -28,6 +30,8 @@ export const PlannerWorkspacePage: React.FC<PlannerWorkspacePageProps> = ({
   const [orders, setOrders] = useState<PlannerOrder[]>([]);
   const [activeOrder, setActiveOrder] = useState<PlannerOrder | null>(null);
   const [liveTelemetry, setLiveTelemetry] = useState<TelemetrySnapshot | null>(null);
+  const [cutoffPreview, setCutoffPreview] = useState<CutoffPreviewResult | null>(null);
+  const [isPreviewing, setIsPreviewing] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState(getPlannerConfig());
@@ -43,6 +47,7 @@ export const PlannerWorkspacePage: React.FC<PlannerWorkspacePageProps> = ({
       setOrders(list);
       setActiveOrder(current);
       setLiveTelemetry(current.telemetry);
+      setCutoffPreview(null);
     } catch (err: any) {
       setError(err.message || 'Failed to load planner workspace.');
     }
@@ -92,8 +97,27 @@ export const PlannerWorkspacePage: React.FC<PlannerWorkspacePageProps> = ({
     try {
       const updated = await getPlannerAdapter().selectCandidate(activeOrder.orderId, candidateId);
       setActiveOrder(updated);
+      setCutoffPreview(null);
     } catch (err: any) {
       setError(err.message || 'Failed to select recovery candidate.');
+    }
+  };
+
+  const handlePreviewCutoff = async (cutoffTime: string) => {
+    if (!activeOrder) return;
+    setIsPreviewing(true);
+    setError(null);
+    try {
+      const preview = await getPlannerAdapter().previewCutoffImpact(
+        activeOrder.orderId,
+        activeOrder.selectedCandidateId,
+        cutoffTime
+      );
+      setCutoffPreview(preview);
+    } catch (err: any) {
+      setError(err.message || 'Failed to simulate cutoff impact.');
+    } finally {
+      setIsPreviewing(false);
     }
   };
 
@@ -173,6 +197,12 @@ export const PlannerWorkspacePage: React.FC<PlannerWorkspacePageProps> = ({
           />
           <PlannerOffersPanel order={activeOrder} />
           <GodownRouteMap order={activeOrder} onSelectCandidate={handleSelectCandidate} />
+          <CutoffChallengePanel
+            order={activeOrder}
+            preview={cutoffPreview}
+            onPreviewCutoff={handlePreviewCutoff}
+            isPreviewing={isPreviewing}
+          />
         </>
       )}
     </div>

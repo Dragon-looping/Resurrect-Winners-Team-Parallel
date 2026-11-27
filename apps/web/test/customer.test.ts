@@ -70,7 +70,7 @@ describe('Customer Portal Logistics Tests (Branch 1)', () => {
 
     assert.equal(updated.status, 'recovery_pending');
     assert.equal(updated.lastCustomerDecision, 'insist_original');
-    assert.ok(updated.customerDelayReason?.includes('50 units together by Friday'));
+    assert.ok(updated.customerDelayReason?.includes('50 fans together by 2026-11-27'));
     assert.equal(updated.confirmedShipments, undefined); // Stock not falsely marked found
   });
 
@@ -138,5 +138,107 @@ describe('Customer Portal Logistics Tests (Branch 1)', () => {
     assert.equal(delayOrder.backlogQuantity, 10);
     assert.equal(delayOrder.confirmedShipments?.length, 1);
     assert.equal(delayOrder.confirmedShipments?.[0].quantity, 40);
+  });
+
+  test('TC-10: Non-fan SKU (water pump) to Manipal survives creation, acceptance, and refresh', async () => {
+    const created = await adapter.createOrder({
+      itemSku: 'PMP-SUB-05-AGR',
+      itemName: '0.5 HP Submersible Agricultural Water Pump',
+      quantity: 20,
+      destination: 'Manipal Commercial Center, Shop #14',
+      requestedArrivalDate: '2026-11-27',
+      mustArriveTogether: false
+    });
+
+    assert.notEqual(created.orderId, 'ORD-2026-MANIPAL-50');
+    assert.match(created.orderId, /^ORD-2026-MANIPAL-/);
+    assert.equal(created.status, 'offer_issued');
+    assert.equal(created.requestedDetails.itemSku, 'PMP-SUB-05-AGR');
+    assert.equal(created.requestedDetails.destination, 'Manipal Commercial Center, Shop #14');
+    assert.equal(created.activeOffer?.proposedShipments.length, 2);
+    assert.equal(created.activeOffer?.proposedShipments[0].quantity, 15);
+    assert.equal(created.activeOffer?.proposedShipments[1].quantity, 5);
+    assert.equal(created.activeOffer?.proposedShipments[0].destination, 'Manipal Commercial Center, Shop #14');
+
+    const accepted = await adapter.replyToOffer(created.orderId, {
+      offerId: created.activeOffer!.offerId,
+      offerVersion: created.activeOffer!.version,
+      decision: 'accept_split'
+    });
+
+    assert.equal(accepted.status, 'confirmed');
+    assert.equal(accepted.confirmedShipments?.length, 2);
+    assert.equal(accepted.confirmedShipments?.[0].quantity, 15);
+    assert.equal(accepted.confirmedShipments?.[1].quantity, 5);
+    assert.equal(accepted.confirmedShipments?.[0].destination, 'Manipal Commercial Center, Shop #14');
+
+    // Simulate refresh via getOrder
+    const refreshed = await adapter.getOrder(created.orderId);
+    assert.equal(refreshed.status, 'confirmed');
+    assert.equal(refreshed.requestedDetails.itemSku, 'PMP-SUB-05-AGR');
+    assert.equal(refreshed.requestedDetails.destination, 'Manipal Commercial Center, Shop #14');
+    assert.equal(refreshed.confirmedShipments?.[0].quantity, 15);
+    assert.equal(refreshed.confirmedShipments?.[1].quantity, 5);
+  });
+
+  test('TC-11: Fan SKU to Kundapura survives creation, acceptance, and refresh', async () => {
+    const created = await adapter.createOrder({
+      itemSku: 'FAN-HV-24-IND',
+      itemName: 'High-Velocity 24" Industrial Pedestal Fans',
+      quantity: 50,
+      destination: 'Kundapura Market Road, Shop #7',
+      requestedArrivalDate: '2026-11-27',
+      mustArriveTogether: false
+    });
+
+    assert.notEqual(created.orderId, 'ORD-2026-MANIPAL-50');
+    assert.match(created.orderId, /^ORD-2026-KUNDAPURA-/);
+    assert.equal(created.requestedDetails.itemSku, 'FAN-HV-24-IND');
+    assert.equal(created.requestedDetails.destination, 'Kundapura Market Road, Shop #7');
+    assert.equal(created.activeOffer?.proposedShipments[0].quantity, 40);
+    assert.equal(created.activeOffer?.proposedShipments[1].quantity, 10);
+    assert.equal(created.activeOffer?.proposedShipments[0].destination, 'Kundapura Market Road, Shop #7');
+
+    const accepted = await adapter.replyToOffer(created.orderId, {
+      offerId: created.activeOffer!.offerId,
+      offerVersion: created.activeOffer!.version,
+      decision: 'accept_split'
+    });
+
+    assert.equal(accepted.status, 'confirmed');
+    assert.equal(accepted.confirmedShipments?.[0].destination, 'Kundapura Market Road, Shop #7');
+    assert.equal(accepted.confirmedShipments?.[1].destination, 'Kundapura Market Road, Shop #7');
+
+    // Simulate refresh via getOrder
+    const refreshed = await adapter.getOrder(created.orderId);
+    assert.equal(refreshed.status, 'confirmed');
+    assert.equal(refreshed.requestedDetails.itemSku, 'FAN-HV-24-IND');
+    assert.equal(refreshed.requestedDetails.destination, 'Kundapura Market Road, Shop #7');
+    assert.equal(refreshed.confirmedShipments?.[0].quantity, 40);
+    assert.equal(refreshed.confirmedShipments?.[1].quantity, 10);
+  });
+
+  test('TC-12: Unknown SKU is rejected without manufacturing stock', async () => {
+    await assert.rejects(
+      async () => {
+        await adapter.createOrder({
+          itemSku: 'UNKNOWN-SKU-999',
+          itemName: 'Nonexistent Item',
+          quantity: 10,
+          destination: 'Manipal',
+          requestedArrivalDate: '2026-11-27',
+          mustArriveTogether: false
+        });
+      },
+      /not recognized/
+    );
+  });
+
+  test('TC-13: Seeded pump scenario integrity', async () => {
+    const pumpOrder = await adapter.getOrder('ORD-2026-BRAHMAVAR-20-PUMP');
+    assert.equal(pumpOrder.requestedDetails.itemSku, 'PMP-SUB-05-AGR');
+    assert.equal(pumpOrder.requestedDetails.quantity, 20);
+    assert.equal(pumpOrder.activeOffer?.proposedShipments[0].quantity, 15);
+    assert.equal(pumpOrder.activeOffer?.proposedShipments[1].quantity, 5);
   });
 });

@@ -59,7 +59,7 @@ export const Layout: React.FC<LayoutProps> = ({
               Request Intake
             </button>
             <button
-              onClick={() => onNavigate && onNavigate('/customer/orders/ORD-2026-MANIPAL-50')}
+              onClick={() => onNavigate && onNavigate(orderRef ? `/customer/orders/${orderRef}` : '/customer/orders/ORD-2026-MANIPAL-50')}
               style={{
                 textDecoration: 'none',
                 fontWeight: activeRoute.startsWith('/customer/orders') ? 600 : 400,
@@ -68,7 +68,7 @@ export const Layout: React.FC<LayoutProps> = ({
                 paddingBottom: '2px'
               }}
             >
-              Order Portal (Manipal #50)
+              {orderRef ? `Order Portal (${orderRef})` : 'Order Portal (Sample)'}
             </button>
           </div>
           <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-faint)', fontSize: '0.75rem' }}>
@@ -84,7 +84,7 @@ export const Layout: React.FC<LayoutProps> = ({
       <footer className="dispatch-footer">
         <div className="dispatch-footer-inner">
           <div>
-            <span>SETUVYUHA Dispatch Engine · Udupi &amp; Manipal Fulfilment Network</span>
+            <span>SETUVYUHA Dispatch Engine · Regional Fulfilment Network</span>
           </div>
           <div style={{ fontFamily: 'var(--font-mono)' }}>
             <span>AUTHORITATIVE LOGISTICS MANIFEST · 2026-11-27</span>

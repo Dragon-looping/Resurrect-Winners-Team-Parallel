@@ -1,6 +1,7 @@
 import React from 'react';
 import { CustomerOrder } from '../types/order.ts';
 import { CheckIcon, AlertIcon, TruckIcon, PackageIcon } from '../../shared/icons.tsx';
+import { getUnitLabel, formatDateString } from '../utils/formatters.ts';
 
 interface ConfirmedScheduleCardProps {
   order: CustomerOrder;
@@ -14,6 +15,12 @@ export const ConfirmedScheduleCard: React.FC<ConfirmedScheduleCardProps> = ({
   const confirmed = order.confirmedShipments || [];
   const isDelay = order.status === 'unavoidable_delay';
   const totalConfirmed = confirmed.reduce((sum, s) => sum + s.quantity, 0);
+  const sku = order.requestedDetails.itemSku;
+  const itemName = order.requestedDetails.itemName;
+  const unitLabel = getUnitLabel(sku, itemName, false);
+  const unitLabelUpper = unitLabel.toUpperCase();
+  const reqQty = order.requestedDetails.quantity;
+  const reqDate = formatDateString(order.requestedDetails.requestedArrivalDate);
 
   return (
     <div className="ruled-box" style={{ background: 'var(--surface)', border: '1px solid var(--rule)' }}>
@@ -54,7 +61,7 @@ export const ConfirmedScheduleCard: React.FC<ConfirmedScheduleCardProps> = ({
       <div style={{ padding: '1.5rem 1.25rem' }}>
         <p style={{ color: 'var(--ink-secondary)', fontSize: '0.95rem', marginBottom: '1.5rem' }}>
           {confirmed.length > 1
-            ? 'Two confirmed consignments have been locked into the Udupi dispatch pipeline. Consignments will arrive across the dates scheduled below.'
+            ? `Two confirmed consignments have been locked into the dispatch pipeline. Consignments will arrive across the dates scheduled below.`
             : 'A single consolidated consignment has been confirmed and locked into the dispatch pipeline.'}
         </p>
 
@@ -83,7 +90,7 @@ export const ConfirmedScheduleCard: React.FC<ConfirmedScheduleCardProps> = ({
                     lineHeight: 1,
                     color: 'var(--forest-green)'
                   }}>
-                    {shp.quantity} FANS
+                    {shp.quantity} {unitLabelUpper}
                   </div>
                 </div>
 
@@ -96,7 +103,7 @@ export const ConfirmedScheduleCard: React.FC<ConfirmedScheduleCardProps> = ({
                       color: 'var(--ink)',
                       textTransform: 'uppercase'
                     }}>
-                      {shp.arrivalDate === '2026-11-27' ? 'Fri, Nov 27, 2026' : shp.arrivalDate === '2026-11-29' ? 'Sun, Nov 29, 2026' : 'Tue, Dec 01, 2026'}
+                      {formatDateString(shp.arrivalDate)}
                     </span>
                     <span style={{
                       fontSize: '0.7rem',
@@ -117,7 +124,7 @@ export const ConfirmedScheduleCard: React.FC<ConfirmedScheduleCardProps> = ({
                   </div>
 
                   <div style={{ display: 'flex', gap: '1rem', marginTop: '0.35rem', fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--ink-muted)' }}>
-                    <span>CARRIER REF: <strong style={{ color: 'var(--ink)' }}>{shp.carrierTrackingRef || 'STV-UD-4081'}</strong></span>
+                    <span>CARRIER REF: <strong style={{ color: 'var(--ink)' }}>{shp.carrierTrackingRef || 'PENDING'}</strong></span>
                     <span>STATUS: <strong style={{ color: 'var(--forest-green)' }}>{shp.statusText}</strong></span>
                   </div>
                 </div>
@@ -137,15 +144,17 @@ export const ConfirmedScheduleCard: React.FC<ConfirmedScheduleCardProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
               <AlertIcon size={18} color="var(--oxide-red)" />
               <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 700, color: 'var(--oxide-red)', textTransform: 'uppercase' }}>
-                Remaining Balance Backlog: {order.backlogQuantity || 10} Fans Outstanding
+                Remaining Balance Backlog: {order.backlogQuantity || 0} {unitLabelUpper} Outstanding
               </span>
             </div>
             <p style={{ fontSize: '0.9rem', color: 'var(--ink)', marginBottom: '0.5rem' }}>
               <strong>Customer-Facing Delay Explanation:</strong> {order.customerDelayReason}
             </p>
             <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', fontSize: '0.8rem', fontFamily: 'var(--font-mono)', color: 'var(--ink-secondary)' }}>
-              <span>ORIGINAL TARGET: <strong className="tabular">{order.requestedDetails.requestedArrivalDate}</strong></span>
-              <span>EARLIEST PROJECTED ARRIVAL: <strong className="tabular" style={{ color: 'var(--oxide-red)' }}>Wednesday, Dec 02, 2026</strong></span>
+              <span>ORIGINAL TARGET: <strong className="tabular">{reqDate}</strong></span>
+              <span>EARLIEST PROJECTED ARRIVAL: <strong className="tabular" style={{ color: 'var(--oxide-red)' }}>
+                {order.requestedDetails.requestedArrivalDate ? 'Pending Supplier ETA' : 'TBD'}
+              </strong></span>
             </div>
           </div>
         )}
@@ -160,10 +169,10 @@ export const ConfirmedScheduleCard: React.FC<ConfirmedScheduleCardProps> = ({
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
             <span style={{ color: 'var(--ink-muted)' }}>
-              Requested: <strong style={{ color: 'var(--ink)' }}>50 units by {order.requestedDetails.requestedArrivalDate}</strong>
+              Requested: <strong style={{ color: 'var(--ink)' }}>{reqQty} {unitLabel} by {reqDate}</strong>
             </span>
             <span style={{ color: 'var(--ink-muted)' }}>
-              Total Confirmed: <strong style={{ color: 'var(--forest-green)' }}>{totalConfirmed} of {order.requestedDetails.quantity} units</strong>
+              Total Confirmed: <strong style={{ color: 'var(--forest-green)' }}>{totalConfirmed} of {reqQty} {unitLabel}</strong>
             </span>
           </div>
         </div>

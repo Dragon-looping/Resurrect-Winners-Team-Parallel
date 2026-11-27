@@ -1,6 +1,7 @@
 import React from 'react';
 import { CustomerOrder, OfferProposal, CustomerDecision } from '../types/order.ts';
 import { ClockIcon, CheckIcon, ArrowRightIcon, TruckIcon, AlertIcon } from '../../shared/icons.tsx';
+import { getUnitLabel, formatDateString, formatDayOfWeek } from '../utils/formatters.ts';
 
 interface LaterOfferCardProps {
   order: CustomerOrder;
@@ -18,10 +19,16 @@ export const LaterOfferCard: React.FC<LaterOfferCardProps> = ({
   const shipment = offer.proposedShipments[0] || {
     quantity: order.requestedDetails.quantity,
     arrivalDate: '2026-12-01',
-    originWarehouse: 'Udupi Consolidated Consolidation',
+    originWarehouse: 'Regional Consolidated Hub',
     destination: order.requestedDetails.destination,
     statusText: 'Proposed: Single consignment following buffer replenishment'
   };
+
+  const unitLabel = getUnitLabel(order.requestedDetails.itemSku, order.requestedDetails.itemName);
+  const unitLabelUpper = getUnitLabel(order.requestedDetails.itemSku, order.requestedDetails.itemName, true);
+  const laterDateFormatted = formatDateString(shipment.arrivalDate);
+  const laterDay = formatDayOfWeek(shipment.arrivalDate);
+  const reqDay = formatDayOfWeek(order.requestedDetails.requestedArrivalDate);
 
   return (
     <div className="ruled-box" style={{ background: 'var(--surface)', border: '1px solid var(--rule)' }}>
@@ -49,7 +56,7 @@ export const LaterOfferCard: React.FC<LaterOfferCardProps> = ({
 
       <div style={{ padding: '1.5rem 1.25rem' }}>
         <p style={{ color: 'var(--ink-secondary)', fontSize: '0.95rem', marginBottom: '1.25rem' }}>
-          To deliver all <strong>{shipment.quantity} units together in one single consignment</strong>, dispatch is scheduled following consolidation from the regional buffer depot.
+          To deliver all <strong>{shipment.quantity} {unitLabel} together in one single consignment</strong>, dispatch is scheduled following consolidation from regional stock buffers.
         </p>
 
         {/* The Single Ruled Shipment Row */}
@@ -75,7 +82,7 @@ export const LaterOfferCard: React.FC<LaterOfferCardProps> = ({
                 lineHeight: 1,
                 color: 'var(--ink)'
               }}>
-                {shipment.quantity} FANS
+                {shipment.quantity} {unitLabelUpper}
               </div>
             </div>
 
@@ -88,7 +95,7 @@ export const LaterOfferCard: React.FC<LaterOfferCardProps> = ({
                   color: 'var(--oxide-red)',
                   textTransform: 'uppercase'
                 }}>
-                  Tuesday, Dec 01, 2026
+                  {laterDateFormatted}
                 </span>
                 <span style={{
                   fontSize: '0.7rem',
@@ -127,7 +134,7 @@ export const LaterOfferCard: React.FC<LaterOfferCardProps> = ({
         }}>
           <AlertIcon size={16} color="var(--ink-muted)" />
           <div style={{ color: 'var(--ink-secondary)' }}>
-            <strong>Terms note:</strong> Rejecting a split delivery does not automatically accept this later date. You must explicitly click below to agree to arrival on <strong>Tuesday, Dec 01</strong>.
+            <strong>Terms note:</strong> Rejecting a split delivery does not automatically accept this later date. You must explicitly click below to agree to arrival on <strong>{laterDateFormatted}</strong>.
           </div>
         </div>
 
@@ -146,7 +153,7 @@ export const LaterOfferCard: React.FC<LaterOfferCardProps> = ({
             }}
           >
             <CheckIcon size={18} color="var(--surface)" />
-            <span>Accept Later Single Delivery (All 50 on Tuesday, Dec 01)</span>
+            <span>Accept Later Single Delivery (All {shipment.quantity} on {laterDay})</span>
           </button>
 
           <div style={{
@@ -167,7 +174,7 @@ export const LaterOfferCard: React.FC<LaterOfferCardProps> = ({
                 color: 'var(--oxide-red)'
               }}
             >
-              <span>Keep all 50 together by Friday (Insist)</span>
+              <span>Keep all {order.requestedDetails.quantity} together by {reqDay} (Insist)</span>
               <ArrowRightIcon size={14} />
             </button>
 

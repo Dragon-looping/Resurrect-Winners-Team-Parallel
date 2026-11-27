@@ -1,6 +1,7 @@
 import React from 'react';
 import { CustomerOrder, OrderStatus } from '../types/order.ts';
 import { CheckIcon, AlertIcon, ClockIcon, PackageIcon } from '../../shared/icons.tsx';
+import { getUnitLabel } from '../utils/formatters.ts';
 
 interface OrderStatusBadgeProps {
   status: OrderStatus;
@@ -156,7 +157,7 @@ interface OrderSummarySideCardProps {
 }
 
 export const OrderSummarySideCard: React.FC<OrderSummarySideCardProps> = ({ order, onNavigate }) => {
-  // Compute quantity breakdown
+  const unitLabel = getUnitLabel(order.requestedDetails.itemSku, order.requestedDetails.itemName);
   const requestedTotal = order.requestedDetails.quantity;
   const confirmedTotal = (order.confirmedShipments || []).reduce((sum, s) => sum + s.quantity, 0);
   const offeredTotal = (order.activeOffer?.proposedShipments || []).reduce((sum, s) => sum + s.quantity, 0);
@@ -183,7 +184,7 @@ export const OrderSummarySideCard: React.FC<OrderSummarySideCardProps> = ({ orde
           <dd style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>{order.requestedDetails.itemName}</dd>
 
           <dt style={{ color: 'var(--ink-muted)' }}>Requested Qty</dt>
-          <dd className="tabular" style={{ fontWeight: 600 }}>{requestedTotal} units</dd>
+          <dd className="tabular" style={{ fontWeight: 600 }}>{requestedTotal} {unitLabel}</dd>
 
           <dt style={{ color: 'var(--ink-muted)' }}>Destination</dt>
           <dd style={{ fontSize: '0.85rem' }}>{order.requestedDetails.destination}</dd>
@@ -214,27 +215,27 @@ export const OrderSummarySideCard: React.FC<OrderSummarySideCardProps> = ({ orde
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.85rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--rule-dark)', paddingBottom: '0.25rem' }}>
             <span style={{ color: 'var(--ink-muted)' }}>1. Total Requested:</span>
-            <span className="tabular" style={{ fontWeight: 600 }}>{requestedTotal} fans</span>
+            <span className="tabular" style={{ fontWeight: 600 }}>{requestedTotal} {unitLabel}</span>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--rule-dark)', paddingBottom: '0.25rem' }}>
             <span style={{ color: 'var(--ink-muted)' }}>2. Currently Offered:</span>
             <span className="tabular" style={{ fontWeight: 600, color: offeredTotal > 0 ? 'var(--amber-warning)' : 'var(--ink-muted)' }}>
-              {offeredTotal} fans
+              {offeredTotal > 0 ? `${offeredTotal} of ${requestedTotal} ${unitLabel} offered` : `0 ${unitLabel}`}
             </span>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--rule-dark)', paddingBottom: '0.25rem' }}>
             <span style={{ color: 'var(--ink-muted)' }}>3. Confirmed &amp; Staged:</span>
             <span className="tabular" style={{ fontWeight: 700, color: confirmedTotal > 0 ? 'var(--forest-green)' : 'var(--ink-muted)' }}>
-              {confirmedTotal} fans
+              {confirmedTotal} {unitLabel}
             </span>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.25rem' }}>
             <span style={{ color: 'var(--ink-muted)' }}>4. Outstanding Balance:</span>
             <span className="tabular" style={{ fontWeight: 700, color: outstanding > 0 ? 'var(--oxide-red)' : 'var(--forest-green)' }}>
-              {outstanding} fans
+              {outstanding} {unitLabel}
             </span>
           </div>
         </div>

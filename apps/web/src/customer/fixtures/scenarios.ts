@@ -285,5 +285,52 @@ export const SEEDED_SCENARIOS: Record<string, CustomerOrder> = {
     },
     createdAt: '2026-11-27T07:30:00Z',
     updatedAt: '2026-11-27T08:31:00Z'
+  },
+
+  // Scenario 9: Agricultural Water Pump Split Offer (Distinct non-fan product)
+  'ORD-2026-BRAHMAVAR-20-PUMP': {
+    orderId: 'ORD-2026-BRAHMAVAR-20-PUMP',
+    version: 1,
+    status: 'offer_issued',
+    requestedDetails: {
+      itemSku: 'PMP-SUB-05-AGR',
+      itemName: '0.5 HP Submersible Agricultural Water Pump',
+      quantity: 20,
+      destination: 'Brahmavar Agro Cooperative Society, Warehouse #3',
+      requestedArrivalDate: '2026-11-27',
+      mustArriveTogether: false,
+      notes: 'Required for scheduled kharif irrigation installation'
+    },
+    activeOffer: {
+      offerId: 'OFF-MANG-PUMP-4412',
+      version: 1,
+      orderId: 'ORD-2026-BRAHMAVAR-20-PUMP',
+      offerType: 'split',
+      proposedShipments: [
+        {
+          shipmentId: 'SHP-PROP-15P',
+          quantity: 15,
+          arrivalDate: '2026-11-27',
+          originWarehouse: 'Mangalore Industrial Depot',
+          destination: 'Brahmavar Agro Cooperative Society, Warehouse #3',
+          isProposed: true,
+          statusText: 'Proposed: Ready at Mangalore dispatch'
+        },
+        {
+          shipmentId: 'SHP-PROP-05P',
+          quantity: 5,
+          arrivalDate: '2026-11-29',
+          originWarehouse: 'Udupi Buffer Yard',
+          destination: 'Brahmavar Agro Cooperative Society, Warehouse #3',
+          isProposed: true,
+          statusText: 'Proposed: Staged from buffer transfer'
+        }
+      ],
+      expiresAt: new Date(Date.now() + 1800000).toISOString(),
+      permittedActions: ['accept_split', 'accept_later', 'insist_original', 'decline'],
+      notes: 'Warehouse physical count reconciliation identified 15 pumps available immediately at Mangalore Industrial Depot. Remaining 5 pumps sourced from Udupi Buffer Yard.'
+    },
+    createdAt: '2026-11-27T08:00:00Z',
+    updatedAt: '2026-11-27T08:15:00Z'
   }
 };

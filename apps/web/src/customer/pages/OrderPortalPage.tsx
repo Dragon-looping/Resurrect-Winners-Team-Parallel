@@ -9,6 +9,7 @@ import { ConfirmedScheduleCard } from '../components/ConfirmedScheduleCard.tsx';
 import { ExpiredOfferCard } from '../components/ExpiredOfferCard.tsx';
 import { OrderStatusBadge, OrderSummarySideCard } from '../components/OrderStatusHeader.tsx';
 import { AlertIcon, ClockIcon, RefreshIcon } from '../../shared/icons.tsx';
+import { getUnitLabel, formatDayOfWeek } from '../utils/formatters.ts';
 
 interface OrderPortalPageProps {
   orderId: string;
@@ -152,18 +153,21 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
 
   if (!order) return null;
 
+  const unitLabel = getUnitLabel(order.requestedDetails.itemSku, order.requestedDetails.itemName, false);
+  const reqDay = formatDayOfWeek(order.requestedDetails.requestedArrivalDate);
+
   // Determine state-based heading & subtext
   let pageHeading = 'Review delivery manifest';
-  let pageSubtext = 'Authoritative logistics record from the Udupi dispatch hub.';
+  let pageSubtext = 'Authoritative logistics record from the regional dispatch hub.';
 
   if (order.status === 'clarifying') {
     pageHeading = 'Resolve delivery ambiguity';
     pageSubtext = 'Please clarify timing specifications to enable automated allocation.';
   } else if (order.status === 'offer_issued') {
     pageHeading = 'Choose a delivery schedule';
-    pageSubtext = 'Udupi warehouse reconciliation updated. Review proposed shipment options below.';
+    pageSubtext = 'Warehouse reconciliation updated. Review proposed shipment options below.';
   } else if (order.status === 'recovery_pending') {
-    pageHeading = 'Checking recovery for 50 units by Friday';
+    pageHeading = `Checking recovery for ${order.requestedDetails.quantity} ${unitLabel} by ${reqDay}`;
     pageSubtext = 'Original terms recorded. Scanning inter-depot transfers and buffer stock.';
   } else if (order.status === 'confirmed') {
     pageHeading = 'Authoritative schedule confirmed';
@@ -274,7 +278,7 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
             onDecision={handleOfferDecision}
             isSubmitting={isSubmitting}
           />
-        ) : order.status === 'offer_issued' && order.activeOffer && order.activeOffer.offerType === 'split' ? (
+        ) : order.status === 'offer_issued' && order.activeOffer && (order.activeOffer.offerType === 'split' || order.activeOffer.offerType === 'standard') ? (
           <SplitOfferCard
             order={order}
             offer={order.activeOffer}

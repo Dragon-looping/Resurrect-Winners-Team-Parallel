@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { getOrderAdapter, getAdapterConfig, setAdapterConfig, resetFixtureData } from '../adapters/orderAdapter.ts';
 import { DeliveryRequest } from '../types/order.ts';
 import { AlertIcon, ArrowRightIcon, CheckIcon, RotateCcwIcon } from '../../shared/icons.tsx';
+import { PRODUCT_CATALOG, findCatalogItem } from '../fixtures/catalog.ts';
 
 interface IntakePageProps {
   onNavigate: (route: string) => void;
@@ -15,16 +16,24 @@ interface FormErrors {
   general?: string;
 }
 
-export const IntakePage: React.FC<IntakePageProps> = ({ onNavigate }) => {
-  const [formData, setFormData] = useState<DeliveryRequest>({
-    itemSku: 'FAN-HV-24-IND',
-    itemName: 'High-Velocity 24" Industrial Pedestal Fans',
-    quantity: 50,
-    destination: 'Manipal Commercial Center, Shop #14',
-    requestedArrivalDate: '2026-11-27', // Friday
+const DEFAULT_SKU = 'FAN-HV-24-IND';
+const defaultCatalogItem = findCatalogItem(DEFAULT_SKU)!;
+
+function makeDefaultForm(sku: string): DeliveryRequest {
+  const item = findCatalogItem(sku) || defaultCatalogItem;
+  return {
+    itemSku: item.sku,
+    itemName: item.name,
+    quantity: item.defaultQuantity,
+    destination: item.defaultDestination,
+    requestedArrivalDate: '2026-11-27',
     mustArriveTogether: false,
-    notes: 'Required for university exhibition opening'
-  });
+    notes: ''
+  };
+}
+
+export const IntakePage: React.FC<IntakePageProps> = ({ onNavigate }) => {
+  const [formData, setFormData] = useState<DeliveryRequest>(makeDefaultForm(DEFAULT_SKU));
 
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -35,6 +44,23 @@ export const IntakePage: React.FC<IntakePageProps> = ({ onNavigate }) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field as keyof FormErrors]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
+    }
+  };
+
+  // When the user picks a SKU from the catalog selector, auto-fill name + defaults
+  const handleSkuSelect = (sku: string) => {
+    const item = findCatalogItem(sku);
+    if (item) {
+      setFormData(prev => ({
+        ...prev,
+        itemSku: item.sku,
+        itemName: item.name,
+        quantity: item.defaultQuantity,
+        destination: item.defaultDestination
+      }));
+      setErrors(prev => ({ ...prev, itemSku: undefined }));
+    } else {
+      setFormData(prev => ({ ...prev, itemSku: sku }));
     }
   };
 
@@ -83,18 +109,13 @@ export const IntakePage: React.FC<IntakePageProps> = ({ onNavigate }) => {
 
   const handleReset = () => {
     resetFixtureData();
-    setFormData({
-      itemSku: 'FAN-HV-24-IND',
-      itemName: 'High-Velocity 24" Industrial Pedestal Fans',
-      quantity: 50,
-      destination: 'Manipal Commercial Center, Shop #14',
-      requestedArrivalDate: '2026-11-27',
-      mustArriveTogether: false,
-      notes: 'Required for university exhibition opening'
-    });
+    setFormData(makeDefaultForm(DEFAULT_SKU));
     setErrors({});
     setSuccessLink(null);
   };
+
+  // Derive current catalog item for inline description
+  const currentCatalogItem = findCatalogItem(formData.itemSku);
 
   return (
     <div style={{ maxWidth: '780px', margin: '0 auto' }}>
@@ -139,7 +160,7 @@ export const IntakePage: React.FC<IntakePageProps> = ({ onNavigate }) => {
         </div>
         
         <p style={{ marginTop: '0.75rem', color: 'var(--ink-secondary)', fontSize: '1rem', maxWidth: '640px' }}>
-          Specify equipment and required destination. The dispatch engine evaluates stock positions across Udupi Central and regional depots.
+          Specify equipment and required destination. The dispatch engine evaluates stock positions across regional depots.
         </p>
       </div>
 
@@ -172,16 +193,15 @@ export const IntakePage: React.FC<IntakePageProps> = ({ onNavigate }) => {
       <form onSubmit={handleSubmit} noValidate>
         <div className="ruled-box" style={{ padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
+          {/* SKU Selector */}
           <div>
-            <label htmlFor="itemSku" style={{ display: 'block', fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.35rem' }}>
-              Equipment SKU / Description <span style={{ color: 'var(--oxide-red)' }}>*</span>
+            <label htmlFor="skuSelect" style={{ display: 'block', fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.35rem' }}>
+              Orderable Item <span style={{ color: 'var(--oxide-red)' }}>*</span>
             </label>
-            <input
-              id="itemSku"
-              type="text"
+            <select
+              id="skuSelect"
               value={formData.itemSku}
-              onChange={(e) => handleInputChange('itemSku', e.target.value)}
-              placeholder="e.g. FAN-HV-24-IND"
+              onChange={(e) => handleSkuSelect(e.target.value)}
               style={{
                 width: '100%',
                 padding: '0.65rem 0.75rem',
@@ -189,15 +209,51 @@ export const IntakePage: React.FC<IntakePageProps> = ({ onNavigate }) => {
                 fontSize: '0.95rem',
                 border: errors.itemSku ? '1px solid var(--oxide-red)' : '1px solid var(--rule-dark)',
                 background: 'var(--surface)',
-                color: 'var(--ink)'
+                color: 'var(--ink)',
+                appearance: 'auto'
               }}
-            />
-            <div style={{ marginTop: '0.35rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-              <span style={{ color: 'var(--ink-muted)' }}>{formData.itemName}</span>
+            >
+              {PRODUCT_CATALOG.map(item => (
+                <option key={item.sku} value={item.sku}>
+                  {item.sku} — {item.name}
+                </option>
+              ))}
+              {!PRODUCT_CATALOG.find(i => i.sku === formData.itemSku) && (
+                <option value={formData.itemSku}>{formData.itemSku} (custom / unknown SKU)</option>
+              )}
+            </select>
+            <div style={{ marginTop: '0.35rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', flexWrap: 'wrap', gap: '0.25rem' }}>
+              <span style={{ color: 'var(--ink-muted)' }}>
+                {currentCatalogItem
+                  ? `${currentCatalogItem.category} · Origin: ${currentCatalogItem.standardOrigin}`
+                  : 'Unknown SKU — backend will validate on submission'}
+              </span>
               {errors.itemSku && (
                 <span style={{ color: 'var(--oxide-red)', fontWeight: 500 }}>{errors.itemSku}</span>
               )}
             </div>
+          </div>
+
+          {/* Item name (read-only display / manual override) */}
+          <div>
+            <label htmlFor="itemName" style={{ display: 'block', fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.35rem' }}>
+              Item Description
+            </label>
+            <input
+              id="itemName"
+              type="text"
+              value={formData.itemName || ''}
+              onChange={(e) => handleInputChange('itemName', e.target.value)}
+              placeholder="Auto-filled from SKU selection"
+              style={{
+                width: '100%',
+                padding: '0.65rem 0.75rem',
+                fontSize: '0.95rem',
+                border: '1px solid var(--rule-dark)',
+                background: 'var(--surface)',
+                color: 'var(--ink)'
+              }}
+            />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
@@ -223,23 +279,18 @@ export const IntakePage: React.FC<IntakePageProps> = ({ onNavigate }) => {
                   color: 'var(--ink)'
                 }}
               />
-              <div style={{ marginTop: '0.35rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>Quick preset:</span>
-                <button
-                  type="button"
-                  onClick={() => handleInputChange('quantity', 50)}
-                  style={{ fontSize: '0.75rem', padding: '0.1rem 0.4rem', border: '1px solid var(--rule)', background: formData.quantity === 50 ? 'var(--surface-subtle)' : 'transparent' }}
-                >
-                  50 fans (Manipal benchmark)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleInputChange('quantity', 25)}
-                  style={{ fontSize: '0.75rem', padding: '0.1rem 0.4rem', border: '1px solid var(--rule)' }}
-                >
-                  25
-                </button>
-              </div>
+              {currentCatalogItem && (
+                <div style={{ marginTop: '0.35rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>Quick preset:</span>
+                  <button
+                    type="button"
+                    onClick={() => handleInputChange('quantity', currentCatalogItem.defaultQuantity)}
+                    style={{ fontSize: '0.75rem', padding: '0.1rem 0.4rem', border: '1px solid var(--rule)', background: formData.quantity === currentCatalogItem.defaultQuantity ? 'var(--surface-subtle)' : 'transparent' }}
+                  >
+                    {currentCatalogItem.defaultQuantity} (default)
+                  </button>
+                </div>
+              )}
               {errors.quantity && (
                 <p style={{ marginTop: '0.25rem', color: 'var(--oxide-red)', fontSize: '0.8rem', fontWeight: 500 }}>
                   {errors.quantity}
@@ -385,8 +436,8 @@ export const IntakePage: React.FC<IntakePageProps> = ({ onNavigate }) => {
             onClick={() => onNavigate('/customer/orders/ORD-2026-MANIPAL-50')}
             style={{ textAlign: 'left', padding: '0.6rem 0.75rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
           >
-            <span style={{ fontWeight: 600 }}>1. Signature Split Offer</span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>40 on Fri / 10 on Sun</span>
+            <span style={{ fontWeight: 600 }}>1. Fans — Split Offer</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>40 on Fri / 10 on Sun · Manipal</span>
           </button>
           <button
             type="button"
@@ -404,7 +455,7 @@ export const IntakePage: React.FC<IntakePageProps> = ({ onNavigate }) => {
             style={{ textAlign: 'left', padding: '0.6rem 0.75rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
           >
             <span style={{ fontWeight: 600 }}>3. Later Single Delivery</span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>50 on Tue, Dec 01</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>50 fans on Tue, Dec 01</span>
           </button>
           <button
             type="button"
@@ -413,7 +464,16 @@ export const IntakePage: React.FC<IntakePageProps> = ({ onNavigate }) => {
             style={{ textAlign: 'left', padding: '0.6rem 0.75rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
           >
             <span style={{ fontWeight: 600 }}>4. Confirmed Schedule</span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>2 shipments booked</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>2 shipments booked · fans</span>
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => onNavigate('/customer/orders/ORD-2026-BRAHMAVAR-20-PUMP')}
+            style={{ textAlign: 'left', padding: '0.6rem 0.75rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
+          >
+            <span style={{ fontWeight: 600 }}>5. Pumps — Split Offer</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>15 on Fri / 5 on Sun · Brahmavar</span>
           </button>
         </div>
       </div>

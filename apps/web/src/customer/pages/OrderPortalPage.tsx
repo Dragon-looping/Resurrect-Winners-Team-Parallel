@@ -3,6 +3,8 @@ import { CustomerOrder, CustomerDecision } from '../types/order.ts';
 import { getOrderAdapter } from '../adapters/orderAdapter.ts';
 import { ClarificationCard } from '../components/ClarificationCard.tsx';
 import { SplitOfferCard } from '../components/SplitOfferCard.tsx';
+import { LaterOfferCard } from '../components/LaterOfferCard.tsx';
+import { RecoveryPendingCard } from '../components/RecoveryPendingCard.tsx';
 import { OrderStatusBadge, OrderSummarySideCard } from '../components/OrderStatusHeader.tsx';
 import { AlertIcon, ClockIcon, RefreshIcon } from '../../shared/icons.tsx';
 
@@ -227,6 +229,20 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
             order={order}
             prompt={order.clarificationPrompt}
             onSubmit={handleClarificationSubmit}
+            isSubmitting={isSubmitting}
+          />
+        ) : order.status === 'recovery_pending' ? (
+          <RecoveryPendingCard
+            order={order}
+            onDecision={handleOfferDecision}
+            onRefresh={() => fetchOrder(true)}
+            isSubmitting={isSubmitting}
+          />
+        ) : order.status === 'offer_issued' && order.activeOffer && order.activeOffer.offerType === 'later' ? (
+          <LaterOfferCard
+            order={order}
+            offer={order.activeOffer}
+            onDecision={handleOfferDecision}
             isSubmitting={isSubmitting}
           />
         ) : order.status === 'offer_issued' && order.activeOffer && order.activeOffer.offerType === 'split' ? (

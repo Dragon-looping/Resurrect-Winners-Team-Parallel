@@ -8,6 +8,7 @@ from app.routes import (
     feeds_router,
     health_router,
     inventory_router,
+    orders_router,
     stock_router,
     stream_router,
 )
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
     application.include_router(feeds_router)
     application.include_router(stock_router)
     application.include_router(stream_router)
+    application.include_router(orders_router)
     return application
 
 

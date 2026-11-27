@@ -3,7 +3,14 @@
 from fastapi import FastAPI
 
 from app.core.config import get_settings
-from app.routes import events_router, feeds_router, health_router, inventory_router
+from app.routes import (
+    events_router,
+    feeds_router,
+    health_router,
+    inventory_router,
+    stock_router,
+    stream_router,
+)
 
 
 def create_app() -> FastAPI:
@@ -23,6 +30,8 @@ def create_app() -> FastAPI:
     application.include_router(events_router)
     application.include_router(inventory_router)
     application.include_router(feeds_router)
+    application.include_router(stock_router)
+    application.include_router(stream_router)
     return application
 
 

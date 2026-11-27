@@ -104,3 +104,12 @@ class PaginatedQuarantinedEventsResponse(BaseModel):
     limit: int
     offset: int
     items: list[QuarantinedEventResponse]
+
+
+class PaginatedInventoryEventsResponse(BaseModel):
+    """Paginated response wrapper for valid persisted inventory events."""
+
+    total: int
+    limit: int
+    offset: int
+    items: list[InventoryEventResponse]

@@ -1,21 +1,25 @@
 """Routes for inventory event ingestion and quarantined event inspection."""
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
 import json
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import ValidationError
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.events_bus import event_stream_broker
 from app.inventory.feeds import record_feed_event_failure, record_feed_event_success
 from app.inventory.ingestion import EventValidationError, ingest_event
 from app.inventory.quarantine import list_quarantined_events, quarantine_event
+from app.models import InventoryEvent, InventoryEventType
 from app.schemas.event import (
     EventIngestionResponse,
     InventoryEventCreate,
     InventoryEventResponse,
+    PaginatedInventoryEventsResponse,
     PaginatedQuarantinedEventsResponse,
     QuarantinedEventResponse,
 )
@@ -164,6 +168,18 @@ async def create_inventory_event(
         received_at=persisted_event.received_at,
     )
 
+    event_stream_broker.publish(
+        persisted_event.event_type,
+        {
+            "event_id": persisted_event.id,
+            "source": persisted_event.source,
+            "external_event_id": persisted_event.external_event_id,
+            "plant_id": persisted_event.plant_id,
+            "sku_id": persisted_event.sku_id,
+            "quantity": persisted_event.quantity,
+        },
+    )
+
     return EventIngestionResponse(
         status="accepted",
         idempotent=False,
@@ -201,3 +217,76 @@ def get_quarantined_events(
         offset=offset,
         items=[QuarantinedEventResponse.model_validate(item) for item in items],
     )
+
+
+@router.get(
+    "/events",
+    response_model=PaginatedInventoryEventsResponse,
+    summary="List inventory events",
+    description="Returns persisted valid inventory events with pagination and filtering.",
+)
+def list_events(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    plant_id: int | None = Query(default=None, gt=0),
+    sku_id: int | None = Query(default=None, gt=0),
+    event_type: InventoryEventType | None = Query(default=None),
+    start_date: date | None = Query(default=None),
+    end_date: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> PaginatedInventoryEventsResponse:
+    """List persisted valid inventory events."""
+    filters = []
+    if plant_id is not None:
+        filters.append(InventoryEvent.plant_id == plant_id)
+    if sku_id is not None:
+        filters.append(InventoryEvent.sku_id == sku_id)
+    if event_type is not None:
+        filters.append(InventoryEvent.event_type == event_type.value)
+    if start_date is not None:
+        filters.append(
+            InventoryEvent.occurred_at >= datetime.combine(start_date, time.min, tzinfo=timezone.utc)
+        )
+    if end_date is not None:
+        filters.append(
+            InventoryEvent.occurred_at <= datetime.combine(end_date, time.max, tzinfo=timezone.utc)
+        )
+
+    total = db.execute(select(func.count()).select_from(InventoryEvent).where(*filters)).scalar_one()
+    items = (
+        db.execute(
+            select(InventoryEvent)
+            .where(*filters)
+            .order_by(InventoryEvent.occurred_at.desc(), InventoryEvent.id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        .scalars()
+        .all()
+    )
+    return PaginatedInventoryEventsResponse(
+        total=total,
+        limit=limit,
+        offset=offset,
+        items=[InventoryEventResponse.model_validate(item) for item in items],
+    )
+
+
+@router.get(
+    "/events/{event_id}",
+    response_model=InventoryEventResponse,
+    summary="Get a single inventory event",
+    description="Returns a single persisted inventory event by ID.",
+)
+def get_event_by_id(
+    event_id: int,
+    db: Session = Depends(get_db),
+) -> InventoryEventResponse:
+    """Fetch a single inventory event by ID."""
+    event = db.execute(select(InventoryEvent).where(InventoryEvent.id == event_id)).scalar_one_or_none()
+    if event is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Inventory event with id={event_id} not found.",
+        )
+    return InventoryEventResponse.model_validate(event)

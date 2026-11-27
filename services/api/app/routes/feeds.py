@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.events_bus import event_stream_broker
 from app.inventory.feeds import evaluate_feed_status, list_feed_statuses, record_heartbeat
 from app.schemas.feed import FeedHeartbeatRequest, FeedStatusItem, FeedStatusListResponse
 
@@ -29,7 +30,16 @@ def post_feed_heartbeat(
         stale_threshold_seconds=payload.stale_threshold_seconds,
         observed_at=payload.observed_at,
     )
-    return evaluate_feed_status(feed, now=payload.observed_at)
+    evaluated = evaluate_feed_status(feed, now=payload.observed_at)
+    event_stream_broker.publish(
+        "FEED_STATUS_CHANGED",
+        {
+            "source": evaluated.source,
+            "status": evaluated.status.value,
+            "is_stale": evaluated.is_stale,
+        },
+    )
+    return evaluated
 
 
 @router.get(

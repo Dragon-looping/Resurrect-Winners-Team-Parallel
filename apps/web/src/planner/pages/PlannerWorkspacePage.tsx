@@ -12,6 +12,7 @@ import {
 } from '../types/planner.ts';
 import { OrderQueuePanel } from '../components/OrderQueuePanel.tsx';
 import { TelemetryStrip } from '../components/TelemetryStrip.tsx';
+import { PlannerOffersPanel } from '../components/PlannerOffersPanel.tsx';
 import { AlertIcon, RotateCcwIcon } from '../../shared/icons.tsx';
 
 interface PlannerWorkspacePageProps {
@@ -152,11 +153,14 @@ export const PlannerWorkspacePage: React.FC<PlannerWorkspacePageProps> = ({
       />
 
       {activeOrder && (
-        <TelemetryStrip
-          order={activeOrder}
-          telemetry={liveTelemetry || activeOrder.telemetry}
-          streamError={streamError}
-        />
+        <>
+          <TelemetryStrip
+            order={activeOrder}
+            telemetry={liveTelemetry || activeOrder.telemetry}
+            streamError={streamError}
+          />
+          <PlannerOffersPanel order={activeOrder} />
+        </>
       )}
     </div>
   );

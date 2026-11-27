@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.fulfilment.allocation import allocate_orders
 from app.fulfilment.lifecycle import get_order_history, transition_order_status
 from app.fulfilment.orders import OrderError, create_order, get_order_by_id, list_orders
 from app.inventory.ingestion import EventValidationError
@@ -124,3 +125,20 @@ def transition_customer_order_status(
     except OrderError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
     return OrderResponse.model_validate(updated)
+
+
+@router.post(
+    "/orders/allocate",
+    response_model=list[OrderResponse],
+    summary="Allocate inventory to orders",
+    description="Allocates available stock to eligible orders by earliest agreed delivery date, creation time, and ID.",
+)
+def run_order_allocation(
+    plant_id: int | None = Query(default=None, gt=0),
+    sku_id: int | None = Query(default=None, gt=0),
+    order_id: int | None = Query(default=None, gt=0),
+    db: Session = Depends(get_db),
+) -> list[OrderResponse]:
+    """Run deterministic priority-based inventory allocation."""
+    updated = allocate_orders(db, plant_id=plant_id, sku_id=sku_id, order_id=order_id)
+    return [OrderResponse.model_validate(o) for o in updated]

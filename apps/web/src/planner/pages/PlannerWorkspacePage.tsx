@@ -13,6 +13,7 @@ import {
 import { OrderQueuePanel } from '../components/OrderQueuePanel.tsx';
 import { TelemetryStrip } from '../components/TelemetryStrip.tsx';
 import { PlannerOffersPanel } from '../components/PlannerOffersPanel.tsx';
+import { GodownRouteMap } from '../components/GodownRouteMap.tsx';
 import { AlertIcon, RotateCcwIcon } from '../../shared/icons.tsx';
 
 interface PlannerWorkspacePageProps {
@@ -82,6 +83,17 @@ export const PlannerWorkspacePage: React.FC<PlannerWorkspacePageProps> = ({
       onNavigate(`/planner/orders/${created.orderId}`);
     } catch (err: any) {
       setError(err.message || 'Failed to create planner order.');
+    }
+  };
+
+  const handleSelectCandidate = async (candidateId: string) => {
+    if (!activeOrder) return;
+    setError(null);
+    try {
+      const updated = await getPlannerAdapter().selectCandidate(activeOrder.orderId, candidateId);
+      setActiveOrder(updated);
+    } catch (err: any) {
+      setError(err.message || 'Failed to select recovery candidate.');
     }
   };
 
@@ -160,6 +172,7 @@ export const PlannerWorkspacePage: React.FC<PlannerWorkspacePageProps> = ({
             streamError={streamError}
           />
           <PlannerOffersPanel order={activeOrder} />
+          <GodownRouteMap order={activeOrder} onSelectCandidate={handleSelectCandidate} />
         </>
       )}
     </div>

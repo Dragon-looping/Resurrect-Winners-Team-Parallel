@@ -129,3 +129,12 @@ class RecoveryApproveRequest(BaseModel):
     """Optional approval metadata for POST /recovery/swaps/{id}/approve."""
 
     actor: str = Field(default="operator", min_length=1, max_length=100)
+
+
+class RecoveryAlternativesResponse(BaseModel):
+    """Alternative recovery options and audit trail for a recovery plan."""
+
+    recovery_id: int
+    target_order_id: int
+    alternatives: list[RecoveryOptionItem]
+    audit_logs: list[RecoveryAuditLogResponse]

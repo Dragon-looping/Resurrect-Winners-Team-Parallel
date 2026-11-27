@@ -7,12 +7,15 @@ from app.core.database import get_db
 from app.fulfilment.orders import OrderError
 from app.fulfilment.recovery.service import (
     approve_recovery_plan,
+    get_recovery_alternatives,
     get_recovery_plan,
     preview_recovery_swap,
     search_recovery_options,
 )
 from app.schemas.recovery import (
+    RecoveryAlternativesResponse,
     RecoveryApproveRequest,
+    RecoveryAuditLogResponse,
     RecoveryPlanResponse,
     RecoveryPreviewRequest,
     RecoverySearchRequest,
@@ -58,6 +61,29 @@ def post_recovery_preview(
     return RecoveryPlanResponse.model_validate(plan)
 
 
+@router.get(
+    "/recovery/{recovery_id}/alternatives",
+    response_model=RecoveryAlternativesResponse,
+    summary="Get recovery alternatives and audit history",
+    description="Returns alternative godown options (feasible and rejected) and audit trail for a recovery plan.",
+)
+def get_recovery_alternatives_endpoint(
+    recovery_id: int,
+    db: Session = Depends(get_db),
+) -> RecoveryAlternativesResponse:
+    """Fetch alternative recovery options and audit trail for a plan."""
+    try:
+        plan, alternatives, logs = get_recovery_alternatives(db, recovery_id)
+    except OrderError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
+    return RecoveryAlternativesResponse(
+        recovery_id=plan.id,
+        target_order_id=plan.target_order_id,
+        alternatives=alternatives,
+        audit_logs=[RecoveryAuditLogResponse.model_validate(log) for log in logs],
+    )
+
+
 @router.post(
     "/recovery/swaps/{recovery_id}/approve",
     response_model=RecoveryPlanResponse,
@@ -79,6 +105,29 @@ def post_recovery_approve(
 
 
 @router.get(
+    "/recovery/{recovery_id}/alternatives",
+    response_model=RecoveryAlternativesResponse,
+    summary="Get recovery alternatives and audit history",
+    description="Returns alternative godown options (feasible and rejected) and audit trail for a recovery plan.",
+)
+def get_recovery_alternatives_endpoint(
+    recovery_id: int,
+    db: Session = Depends(get_db),
+) -> RecoveryAlternativesResponse:
+    """Fetch alternative recovery options and audit trail for a plan."""
+    try:
+        plan, alternatives, logs = get_recovery_alternatives(db, recovery_id)
+    except OrderError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
+    return RecoveryAlternativesResponse(
+        recovery_id=plan.id,
+        target_order_id=plan.target_order_id,
+        alternatives=alternatives,
+        audit_logs=[RecoveryAuditLogResponse.model_validate(log) for log in logs],
+    )
+
+
+@router.get(
     "/recovery/{recovery_id}",
     response_model=RecoveryPlanResponse,
     summary="Get recovery plan details",
@@ -94,6 +143,29 @@ def get_recovery_by_id(
     except OrderError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
     return RecoveryPlanResponse.model_validate(plan)
+
+
+@router.get(
+    "/recovery/{recovery_id}/alternatives",
+    response_model=RecoveryAlternativesResponse,
+    summary="Get recovery alternatives and audit history",
+    description="Returns alternative godown options (feasible and rejected) and audit trail for a recovery plan.",
+)
+def get_recovery_alternatives_endpoint(
+    recovery_id: int,
+    db: Session = Depends(get_db),
+) -> RecoveryAlternativesResponse:
+    """Fetch alternative recovery options and audit trail for a plan."""
+    try:
+        plan, alternatives, logs = get_recovery_alternatives(db, recovery_id)
+    except OrderError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
+    return RecoveryAlternativesResponse(
+        recovery_id=plan.id,
+        target_order_id=plan.target_order_id,
+        alternatives=alternatives,
+        audit_logs=[RecoveryAuditLogResponse.model_validate(log) for log in logs],
+    )
 
 
 @router.post(
@@ -114,3 +186,26 @@ def post_recovery_approve(
     except OrderError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
     return RecoveryPlanResponse.model_validate(plan)
+
+
+@router.get(
+    "/recovery/{recovery_id}/alternatives",
+    response_model=RecoveryAlternativesResponse,
+    summary="Get recovery alternatives and audit history",
+    description="Returns alternative godown options (feasible and rejected) and audit trail for a recovery plan.",
+)
+def get_recovery_alternatives_endpoint(
+    recovery_id: int,
+    db: Session = Depends(get_db),
+) -> RecoveryAlternativesResponse:
+    """Fetch alternative recovery options and audit trail for a plan."""
+    try:
+        plan, alternatives, logs = get_recovery_alternatives(db, recovery_id)
+    except OrderError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
+    return RecoveryAlternativesResponse(
+        recovery_id=plan.id,
+        target_order_id=plan.target_order_id,
+        alternatives=alternatives,
+        audit_logs=[RecoveryAuditLogResponse.model_validate(log) for log in logs],
+    )

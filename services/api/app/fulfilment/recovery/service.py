@@ -260,6 +260,51 @@ def preview_recovery_swap(
     return plan
 
 
+def get_recovery_alternatives(
+    db: Session,
+    recovery_id: int,
+) -> tuple[RecoveryPlan, list[RecoveryOptionItem], list[RecoveryAuditLog]]:
+    """Return alternative donor options and audit history for a recovery plan."""
+    plan = get_recovery_plan(db, recovery_id)
+    target_order = get_order_by_id(db, plan.target_order_id)
+
+    donors = find_eligible_donors(db, target_order, plan.quantity)
+    alternatives: list[RecoveryOptionItem] = []
+    for donor in donors:
+        if donor.donor_plant_id == plan.donor_plant_id and donor.donor_order_id == plan.donor_order_id:
+            continue
+        donor_order = (
+            db.get(CustomerOrder, donor.donor_order_id) if donor.donor_order_id is not None else None
+        )
+        item, _ = _evaluate_option(
+            db,
+            target_order=target_order,
+            donor_plant_id=donor.donor_plant_id,
+            donor_plant_name=donor.donor_plant_name,
+            donor_order=donor_order,
+            quantity=donor.max_donatable_quantity,
+            unit_selling_price=1000.0,
+            unit_procurement_cost=600.0,
+            wait_penalty_per_unit=250.0,
+            margin_floor_pct=plan.margin_floor_pct,
+            evaluated_at=None,
+        )
+        alternatives.append(item)
+
+    alternatives.sort(key=lambda o: (not o.is_feasible, -o.net_benefit, o.donor_plant_id))
+
+    logs = list(
+        db.execute(
+            select(RecoveryAuditLog)
+            .where(RecoveryAuditLog.recovery_plan_id == plan.id)
+            .order_by(RecoveryAuditLog.created_at.asc(), RecoveryAuditLog.id.asc())
+        )
+        .scalars()
+        .all()
+    )
+    return plan, alternatives, logs
+
+
 def get_recovery_plan(db: Session, recovery_id: int) -> RecoveryPlan:
     """Fetch a recovery plan by ID or raise OrderError(404)."""
     plan = db.execute(
@@ -509,3 +554,48 @@ def approve_recovery_plan(
 
     db.refresh(plan)
     return plan
+
+
+def get_recovery_alternatives(
+    db: Session,
+    recovery_id: int,
+) -> tuple[RecoveryPlan, list[RecoveryOptionItem], list[RecoveryAuditLog]]:
+    """Return alternative donor options and audit history for a recovery plan."""
+    plan = get_recovery_plan(db, recovery_id)
+    target_order = get_order_by_id(db, plan.target_order_id)
+
+    donors = find_eligible_donors(db, target_order, plan.quantity)
+    alternatives: list[RecoveryOptionItem] = []
+    for donor in donors:
+        if donor.donor_plant_id == plan.donor_plant_id and donor.donor_order_id == plan.donor_order_id:
+            continue
+        donor_order = (
+            db.get(CustomerOrder, donor.donor_order_id) if donor.donor_order_id is not None else None
+        )
+        item, _ = _evaluate_option(
+            db,
+            target_order=target_order,
+            donor_plant_id=donor.donor_plant_id,
+            donor_plant_name=donor.donor_plant_name,
+            donor_order=donor_order,
+            quantity=donor.max_donatable_quantity,
+            unit_selling_price=1000.0,
+            unit_procurement_cost=600.0,
+            wait_penalty_per_unit=250.0,
+            margin_floor_pct=plan.margin_floor_pct,
+            evaluated_at=None,
+        )
+        alternatives.append(item)
+
+    alternatives.sort(key=lambda o: (not o.is_feasible, -o.net_benefit, o.donor_plant_id))
+
+    logs = list(
+        db.execute(
+            select(RecoveryAuditLog)
+            .where(RecoveryAuditLog.recovery_plan_id == plan.id)
+            .order_by(RecoveryAuditLog.created_at.asc(), RecoveryAuditLog.id.asc())
+        )
+        .scalars()
+        .all()
+    )
+    return plan, alternatives, logs

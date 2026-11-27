@@ -1,0 +1,26 @@
+"""Entry point and application factory for the SETUVYUHA FastAPI service."""
+
+from fastapi import FastAPI
+
+from app.core.config import get_settings
+from app.routes import health_router
+
+
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application instance."""
+    settings = get_settings()
+
+    application = FastAPI(
+        title=settings.app_title,
+        description=settings.app_description,
+        version=settings.app_version,
+        docs_url=settings.docs_url,
+        redoc_url=settings.redoc_url,
+        openapi_url=settings.openapi_url,
+    )
+
+    application.include_router(health_router)
+    return application
+
+
+app = create_app()

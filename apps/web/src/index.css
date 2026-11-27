@@ -1,0 +1,215 @@
+:root {
+  --canvas: #FAF8F5;
+  --surface: #FFFFFF;
+  --surface-subtle: #F5F3EF;
+  --ink: #18181B;
+  --ink-secondary: #44403C;
+  --ink-muted: #57534E;
+  --ink-faint: #78716C;
+  --rule: #E7E5E4;
+  --rule-dark: #D6D3D1;
+  
+  /* Accent & Status */
+  --oxide-red: #991B1B;
+  --oxide-red-hover: #7F1D1D;
+  --oxide-red-subtle: #FEF2F2;
+  --forest-green: #14532D;
+  --forest-green-subtle: #F0FDF4;
+  --amber-warning: #854D0E;
+  --amber-subtle: #FEFCE8;
+  --neutral-border: #D6D3D1;
+  
+  /* Typography */
+  --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  background-color: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+/* Numerals must always align in schedules and references */
+.tabular, table, .tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* High-contrast focus state */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--oxide-red);
+  outline-offset: 2px;
+}
+
+/* Base button */
+button {
+  font-family: inherit;
+  font-size: 0.95rem;
+  cursor: pointer;
+  border: none;
+  background: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Dispatch layout container */
+.dispatch-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.dispatch-header {
+  background-color: var(--canvas);
+  border-bottom: 1px solid var(--rule);
+  padding: 1rem 1.5rem;
+}
+
+.dispatch-header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.brand-title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: var(--ink);
+  text-transform: uppercase;
+}
+
+.brand-tag {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+}
+
+.dispatch-main {
+  flex: 1;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.dispatch-footer {
+  border-top: 1px solid var(--rule);
+  padding: 1.5rem;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+  background-color: var(--canvas);
+}
+
+.dispatch-footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+/* Utility ruled box */
+.ruled-box {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 0;
+}
+
+.rule-top {
+  border-top: 1px solid var(--rule);
+}
+
+.rule-bottom {
+  border-bottom: 1px solid var(--rule);
+}
+
+/* Primary oxide red button */
+.btn-primary {
+  background-color: var(--oxide-red);
+  color: var(--surface);
+  font-weight: 600;
+  padding: 0.75rem 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid var(--oxide-red);
+  text-decoration: none;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--oxide-red-hover);
+  border-color: var(--oxide-red-hover);
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--ink);
+  font-weight: 500;
+  padding: 0.75rem 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid var(--rule-dark);
+  text-decoration: none;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--surface-subtle);
+  border-color: var(--ink-secondary);
+}
+
+/* Responsive grid for customer portal */
+.dispatch-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+}
+
+@media (min-width: 900px) {
+  .dispatch-grid {
+    grid-template-columns: 1fr 340px;
+    align-items: start;
+  }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

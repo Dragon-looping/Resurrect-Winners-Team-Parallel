@@ -1,1 +1,1 @@
-"""SETUVYUHA API test suite."""
+"""Test suite for the SETUVYUHA API service."""

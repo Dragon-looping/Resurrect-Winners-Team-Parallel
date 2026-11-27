@@ -1,7 +1,10 @@
 """Entry point and application factory for the SETUVYUHA FastAPI service."""
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
+from app.cases.router import cases_router
+from app.clarification.router import clarification_router
 from app.core.config import get_settings
 from app.routes import (
     events_router,
@@ -31,6 +34,19 @@ def create_app() -> FastAPI:
         openapi_url=settings.openapi_url,
     )
 
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:4173",
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Core backend routers from main
     application.include_router(health_router)
     application.include_router(events_router)
     application.include_router(inventory_router)
@@ -42,6 +58,13 @@ def create_app() -> FastAPI:
     application.include_router(plans_router)
     application.include_router(production_router)
     application.include_router(recovery_router)
+
+    # P4 Case Steering & Clarification routers (root + /api compatibility mirror)
+    application.include_router(cases_router)
+    application.include_router(clarification_router)
+    application.include_router(cases_router, prefix="/api", include_in_schema=False)
+    application.include_router(clarification_router, prefix="/api", include_in_schema=False)
+
     return application
 
 

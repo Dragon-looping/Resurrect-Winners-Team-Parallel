@@ -1,0 +1,1 @@
+"""SETUVYUHA API test suite."""

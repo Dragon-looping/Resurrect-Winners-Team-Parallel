@@ -30,6 +30,38 @@ def test_post_events_persists_supported_event_types(
     udupi = seeded_catalog["plants"]["Udupi"]  # type: ignore[index]
     fans = seeded_catalog["skus"]["Electric fans"]  # type: ignore[index]
 
+    if event_type != InventoryEventType.STOCK_RECEIVED.value:
+        seed_receipt = client.post(
+            "/events",
+            json={
+                "source": "wms-udupi",
+                "external_event_id": f"seed-receipt-{event_type.lower()}",
+                "plant_id": udupi.id,
+                "sku_id": fans.id,
+                "event_type": InventoryEventType.STOCK_RECEIVED.value,
+                "quantity": 100,
+                "source_sequence": 0,
+                "occurred_at": "2026-11-27T08:00:00Z",
+            },
+        )
+        assert seed_receipt.status_code == 201
+
+    if event_type == InventoryEventType.STOCK_RELEASED.value:
+        seed_reserve = client.post(
+            "/events",
+            json={
+                "source": "wms-udupi",
+                "external_event_id": "seed-reserve-for-release",
+                "plant_id": udupi.id,
+                "sku_id": fans.id,
+                "event_type": InventoryEventType.STOCK_RESERVED.value,
+                "quantity": 20,
+                "source_sequence": 0,
+                "occurred_at": "2026-11-27T09:00:00Z",
+            },
+        )
+        assert seed_reserve.status_code == 201
+
     payload = {
         "source": "wms-udupi",
         "external_event_id": f"evt-{event_type.lower()}-1",

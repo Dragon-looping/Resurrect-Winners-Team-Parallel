@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.inventory.engine import StockCalculationError, recompute_balance_for_pair
 from app.models import InventoryEvent, Plant, SKU
 from app.schemas.event import InventoryEventCreate
 
@@ -46,7 +47,7 @@ def find_existing_event(
 
 
 def ingest_event(db: Session, payload: InventoryEventCreate) -> tuple[InventoryEvent, bool]:
-    """Validate, deduplicate idempotently, and persist an inventory event.
+    """Validate, deduplicate idempotently, persist event, and update stock projection.
 
     Returns a tuple of (event, is_duplicate).
     """
@@ -70,7 +71,12 @@ def ingest_event(db: Session, payload: InventoryEventCreate) -> tuple[InventoryE
     )
     db.add(event)
     try:
+        db.flush()
+        recompute_balance_for_pair(db, payload.plant_id, payload.sku_id, validate_rules=True)
         db.commit()
+    except StockCalculationError as exc:
+        db.rollback()
+        raise EventValidationError(exc.reason, status_code=exc.status_code) from exc
     except IntegrityError:
         db.rollback()
         concurrent_existing = find_existing_event(db, payload.source, payload.external_event_id)

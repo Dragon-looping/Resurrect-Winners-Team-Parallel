@@ -76,3 +76,55 @@ class RecoveryStatus(StrEnum):
     PREVIEW = "PREVIEW"
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
+
+
+class ProcurementRole(StrEnum):
+    """Authorized operational roles for procurement and briefings."""
+
+    WAREHOUSE_MANAGER = "WAREHOUSE_MANAGER"
+    PROCUREMENT_OFFICER = "PROCUREMENT_OFFICER"
+    ADMINISTRATOR = "ADMINISTRATOR"
+    PLANNER = "PLANNER"
+    CUSTOMER = "CUSTOMER"
+    AI_SYSTEM = "AI_SYSTEM"
+
+
+class UrgencyLevel(StrEnum):
+    """Urgency classification for shortages and proposals."""
+
+    CRITICAL = "CRITICAL"
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+
+
+class ProposalStatus(StrEnum):
+    """Lifecycle states for a purchase proposal."""
+
+    DRAFT = "DRAFT"
+    PENDING_APPROVAL = "PENDING_APPROVAL"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    CANCELLED = "CANCELLED"
+    ORDER_CREATED = "ORDER_CREATED"
+
+
+class PurchaseOrderStatus(StrEnum):
+    """Lifecycle states for a purchase order."""
+
+    CREATED = "CREATED"
+    READY_TO_SEND = "READY_TO_SEND"
+    SENT = "SENT"
+    ACKNOWLEDGED = "ACKNOWLEDGED"
+    FULFILLED = "FULFILLED"
+    CANCELLED = "CANCELLED"
+
+
+class EmailDeliveryStatus(StrEnum):
+    """Delivery lifecycle states for supplier purchase order emails."""
+
+    PREVIEWED = "PREVIEWED"
+    CONFIRMED_PENDING = "CONFIRMED_PENDING"
+    SENT = "SENT"
+    FAILED = "FAILED"
+    SIMULATED_UNCONFIGURED = "SIMULATED_UNCONFIGURED"

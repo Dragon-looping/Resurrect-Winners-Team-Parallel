@@ -128,7 +128,11 @@ export const EventDetailsRetryScreen: React.FC = () => {
           {event.status === 'failed' && event.errorDiagnostics && (
             <AlertBanner
               tone="error"
-              title={`Backend Sync Failed · ${event.errorDiagnostics.code}`}
+              title={
+                event.quarantined
+                  ? `Event Quarantined · ${event.errorDiagnostics.code}`
+                  : `Backend Sync Failed · ${event.errorDiagnostics.code}`
+              }
               message={event.errorDiagnostics.message}
             />
           )}
@@ -240,22 +244,24 @@ export const EventDetailsRetryScreen: React.FC = () => {
           {/* Recovery Actions */}
           {event.status !== 'submitted' && (
             <View style={styles.recoveryBar}>
-              <Button
-                label={
-                  retrying
-                    ? `Retrying ${event.eventId}...`
-                    : `Retry ${event.eventId}`
-                }
-                leftIcon="sync"
-                onPress={handleRetry}
-                loading={retrying}
-                disabled={retrying}
-              />
+              {!event.quarantined && (
+                <Button
+                  label={
+                    retrying
+                      ? `Retrying ${event.eventId}...`
+                      : `Retry ${event.eventId}`
+                  }
+                  leftIcon="sync"
+                  onPress={handleRetry}
+                  loading={retrying}
+                  disabled={retrying}
+                />
+              )}
 
               <View style={styles.secondaryRow}>
                 <Button
                   label="Edit Payload"
-                  variant="secondary"
+                  variant={event.quarantined ? 'primary' : 'secondary'}
                   onPress={handleEditPayload}
                   style={styles.halfBtn}
                 />
@@ -315,7 +321,7 @@ const PayloadRow: React.FC<PayloadRowProps> = ({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.surface },
   scroll: { flex: 1 },
-  content: { padding: Spacing.pageMargin, paddingBottom: 32, alignItems: 'center' },
+  content: { padding: Spacing.pageMargin, paddingBottom: 48, alignItems: 'center' },
   responsiveColumn: { width: '100%', maxWidth: 680, gap: Spacing.gutterLg },
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { fontFamily: FontFamily.body, fontSize: 14, color: Colors.onSurfaceVariant },

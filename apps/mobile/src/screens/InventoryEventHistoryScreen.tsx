@@ -24,8 +24,11 @@ export const InventoryEventHistoryScreen: React.FC = () => {
     events,
     lastSyncIst,
     isOffline,
+    isSyncingLiveData,
+    eventsPagination,
     navigate,
     retryAllEvents,
+    loadMoreEvents,
   } = useApp();
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -244,7 +247,8 @@ export const InventoryEventHistoryScreen: React.FC = () => {
                       </View>
                       <Text style={styles.monoSub} numberOfLines={1}>
                         {evt.skuId} · {deltaPrefix}
-                        {evt.qtyDelta} EA · {evt.timestampIst}
+                        {evt.qtyDelta} EA · {evt.timestampIst} ·{' '}
+                        {evt.serverConfirmed ? 'Server' : 'Local'}
                       </Text>
                     </View>
 
@@ -261,6 +265,25 @@ export const InventoryEventHistoryScreen: React.FC = () => {
               })
             )}
           </View>
+
+          {eventsPagination.hasMore && (
+            <Pressable
+              onPress={loadMoreEvents}
+              disabled={isSyncingLiveData}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.loadMoreBtn,
+                pressed && styles.pressedSurface,
+                isSyncingLiveData && { opacity: 0.65 },
+              ]}
+            >
+              <Text style={styles.loadMoreText}>
+                {isSyncingLiveData
+                  ? 'Loading events...'
+                  : `Load More (${events.length} of ${eventsPagination.total})`}
+              </Text>
+            </Pressable>
+          )}
         </View>
       </ScrollView>
 
@@ -413,13 +436,15 @@ const styles = StyleSheet.create({
   eventTopLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.gutterSm,
+    flexWrap: 'wrap',
+    gap: Spacing.gutterXs,
   },
   eventId: {
     fontFamily: FontFamily.mono,
     fontSize: 12,
     lineHeight: 16,
     color: Colors.onSurfaceVariant,
+    flexShrink: 0,
   },
   eventTitle: {
     fontFamily: FontFamily.title,
@@ -441,5 +466,19 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.body,
     fontSize: 14,
     color: Colors.onSurfaceVariant,
+  },
+  loadMoreBtn: {
+    minHeight: 44,
+    borderRadius: Radii.default,
+    borderWidth: 1,
+    borderColor: Colors.outlineVariant,
+    backgroundColor: Colors.surfaceContainerLowest,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadMoreText: {
+    fontFamily: FontFamily.label,
+    fontSize: 13,
+    color: Colors.primary,
   },
 });

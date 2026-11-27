@@ -25,19 +25,28 @@ export const DashboardScreen: React.FC = () => {
     isOffline,
     lastSyncIst,
     heartbeatIst,
+    feedHealth,
+    isSyncingLiveData,
+    liveDataError,
+    dataSourceMode,
     pendingAndFailedCount,
     failedCount,
     navigate,
     selectSku,
+    refreshLiveData,
   } = useApp();
 
   const totals = useMemo(() => {
     const onHand = plantSkus.reduce((acc, s) => acc + s.onHand, 0);
     const reserved = plantSkus.reduce((acc, s) => acc + s.reserved, 0);
+    const netAvail = plantSkus.reduce(
+      (acc, s) => acc + (s.availableStock ?? Math.max(0, s.onHand - s.reserved)),
+      0
+    );
     return {
       onHand,
       reserved,
-      netAvail: Math.max(0, onHand - reserved),
+      netAvail,
       skuCount: plantSkus.length,
     };
   }, [plantSkus]);
@@ -99,42 +108,97 @@ export const DashboardScreen: React.FC = () => {
               <View style={styles.feedTopRow}>
                 <View style={styles.feedStatusRow}>
                   <MaterialIcons
-                    name={isOffline ? 'pause-circle-outline' : 'check-circle-outline'}
+                    name={
+                      isOffline || feedHealth?.status === 'STALE'
+                        ? 'pause-circle-outline'
+                        : feedHealth?.status === 'DEGRADED'
+                          ? 'error-outline'
+                          : feedHealth?.status === 'HEALTHY'
+                            ? 'check-circle-outline'
+                            : 'help-outline'
+                    }
                     size={16}
-                    color={isOffline ? Colors.warning : Colors.success}
+                    color={
+                      isOffline || feedHealth?.status === 'STALE'
+                        ? Colors.warning
+                        : feedHealth?.status === 'DEGRADED'
+                          ? Colors.error
+                          : feedHealth?.status === 'HEALTHY'
+                            ? Colors.success
+                            : Colors.onSurfaceVariant
+                    }
                   />
                   <Text
                     style={[
                       styles.feedStatusLabel,
-                      { color: isOffline ? Colors.onWarningContainer : Colors.onSuccessContainer },
+                      {
+                        color:
+                          isOffline || feedHealth?.status === 'STALE'
+                            ? Colors.onWarningContainer
+                            : feedHealth?.status === 'DEGRADED'
+                              ? Colors.onErrorContainer
+                              : feedHealth?.status === 'HEALTHY'
+                                ? Colors.onSuccessContainer
+                                : Colors.onSurfaceVariant,
+                      },
                     ]}
                   >
                     {isOffline
-                      ? 'Warehouse Feed Paused · Stale'
-                      : 'Warehouse Feed Live · Synced'}
+                      ? 'Warehouse Feed Paused · Offline'
+                      : feedHealth
+                        ? `Feed ${feedHealth.status}${feedHealth.isStale ? ' · Stale' : ''} (${feedHealth.source})`
+                        : `Feed UNKNOWN · ${dataSourceMode === 'cached' ? 'Cached' : 'Local'}`}
                   </Text>
                 </View>
-                <Pressable
-                  onPress={() => navigate('InventoryEventHistory')}
-                  hitSlop={8}
-                >
-                  <Text style={styles.primaryLink}>
-                    Queue ({pendingAndFailedCount})
-                  </Text>
-                </Pressable>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  {!isOffline && (
+                    <Pressable onPress={refreshLiveData} hitSlop={8}>
+                      <Text style={styles.primaryLink}>
+                        {isSyncingLiveData ? 'Syncing...' : 'Refresh'}
+                      </Text>
+                    </Pressable>
+                  )}
+                  <Pressable
+                    onPress={() => navigate('InventoryEventHistory')}
+                    hitSlop={8}
+                  >
+                    <Text style={styles.primaryLink}>
+                      Queue ({pendingAndFailedCount})
+                    </Text>
+                  </Pressable>
+                </View>
               </View>
 
               <View style={styles.feedMetaRow}>
-                <Text style={styles.monoSub}>Heartbeat: {heartbeatIst}</Text>
-                <Text style={styles.monoSub}>Last sync: {lastSyncIst}</Text>
+                <Text style={styles.monoSub}>
+                  Heartbeat: {feedHealth?.lastHeartbeatIst ?? (isOffline ? heartbeatIst : 'No signal')}
+                </Text>
+                <Text style={styles.monoSub}>
+                  Last event: {feedHealth?.lastEventIst ?? lastSyncIst}
+                </Text>
               </View>
-              {isOffline && (
+              {(feedHealth?.dataWarning || feedHealth?.lastErrorMessage) && (
+                <Text style={styles.staleNotice}>
+                  {feedHealth.dataWarning ?? feedHealth.lastErrorMessage}
+                </Text>
+              )}
+              {isOffline && !feedHealth?.dataWarning && (
                 <Text style={styles.staleNotice}>
                   Last usable update: {lastSyncIst}
                 </Text>
               )}
             </View>
           </View>
+
+          {liveDataError && (
+            <AlertBanner
+              tone="warning"
+              title="Backend Sync Notice · Showing Cached Data"
+              message={liveDataError}
+              actionLabel="Retry"
+              onAction={refreshLiveData}
+            />
+          )}
 
           {/* Stock-Out Risk Warning (Separate from Feed/Sync Warnings) */}
           {stockOutSku && (

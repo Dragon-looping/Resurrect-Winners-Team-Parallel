@@ -41,7 +41,7 @@ export const MainTopBar: React.FC = () => {
       </Pressable>
       <View style={styles.mainRight}>
         {isDevSession && (
-          <StatusBadge label="DEV MODE" variant="warning" />
+          <StatusBadge label="DEV" variant="warning" />
         )}
         <Pressable
           onPress={toggleOffline}
@@ -145,11 +145,12 @@ const styles = StyleSheet.create({
   },
   logoWrap: {
     justifyContent: 'center',
-    flexShrink: 1,
+    overflow: 'hidden',
+    flexShrink: 0,
   },
   logo: {
-    width: 124,
-    height: 28,
+    width: 104,
+    height: 24,
   },
   mainRight: {
     flexDirection: 'row',

@@ -1,5 +1,5 @@
 import { AuthUser } from '../types/inventory';
-import { getApiBaseUrl } from './config';
+import { apiRequest } from './apiClient';
 
 export interface AuthResult {
   ok: boolean;
@@ -14,78 +14,44 @@ export interface AuthService {
 
 /**
  * AuthService implementation targeting P2's FastAPI backend.
+ * Production authentication remains unavailable until P2 adds POST /auth/login.
  * Does not invent credentials or fake successful authentication.
  */
 class BackendAuthService implements AuthService {
   async signIn(email: string, password: string): Promise<AuthResult> {
-    const baseUrl = getApiBaseUrl();
-    if (!baseUrl) {
-      return {
-        ok: false,
-        error:
-          'EXPO_PUBLIC_API_BASE_URL is not configured. Set it to the FastAPI backend URL to sign in.',
-      };
-    }
+    const result = await apiRequest<{
+      access_token?: string;
+      token?: string;
+      user?: { email?: string; name?: string; role?: string };
+    }>('/auth/login', {
+      method: 'POST',
+      body: { email, password },
+    });
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-
-    try {
-      const response = await fetch(`${baseUrl}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-        signal: controller.signal,
-      });
-
-      if (response.status === 401 || response.status === 403) {
+    if (!result.ok) {
+      if (result.error.status === 404) {
         return {
           ok: false,
           error:
-            'Incorrect email or password. Verify your credentials and try again.',
-        };
-      }
-
-      if (!response.ok) {
-        return {
-          ok: false,
-          error: `Authentication service returned HTTP ${response.status}.`,
-        };
-      }
-
-      const data = (await response.json()) as {
-        access_token?: string;
-        token?: string;
-        user?: { email?: string; name?: string; role?: string };
-      };
-
-      return {
-        ok: true,
-        user: {
-          email: data.user?.email ?? email,
-          name: data.user?.name,
-          role: data.user?.role ?? 'Warehouse Manager',
-          token: data.access_token ?? data.token,
-        },
-      };
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        return {
-          ok: false,
-          error: 'Authentication request timed out. Check network connectivity.',
+            'Authentication endpoint (POST /auth/login) is not yet available on the backend.',
         };
       }
       return {
         ok: false,
-        error:
-          'Unable to reach authentication server. Verify EXPO_PUBLIC_API_BASE_URL and connectivity.',
+        error: result.error.message,
       };
-    } finally {
-      clearTimeout(timeout);
     }
+
+    return {
+      ok: true,
+      user: {
+        email: result.data.user?.email ?? email,
+        name: result.data.user?.name,
+        role: result.data.user?.role ?? 'Warehouse Manager',
+        token: result.data.access_token ?? result.data.token,
+        isDevMode: false,
+      },
+    };
   }
 
   async signOut(): Promise<void> {

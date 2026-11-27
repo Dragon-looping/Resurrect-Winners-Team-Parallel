@@ -5,6 +5,7 @@ import { ClarificationCard } from '../components/ClarificationCard.tsx';
 import { SplitOfferCard } from '../components/SplitOfferCard.tsx';
 import { LaterOfferCard } from '../components/LaterOfferCard.tsx';
 import { RecoveryPendingCard } from '../components/RecoveryPendingCard.tsx';
+import { ConfirmedScheduleCard } from '../components/ConfirmedScheduleCard.tsx';
 import { OrderStatusBadge, OrderSummarySideCard } from '../components/OrderStatusHeader.tsx';
 import { AlertIcon, ClockIcon, RefreshIcon } from '../../shared/icons.tsx';
 
@@ -251,6 +252,11 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
             offer={order.activeOffer}
             onDecision={handleOfferDecision}
             isSubmitting={isSubmitting}
+          />
+        ) : order.status === 'confirmed' || order.status === 'unavoidable_delay' ? (
+          <ConfirmedScheduleCard
+            order={order}
+            onNavigate={onNavigate}
           />
         ) : (
           <div className="ruled-box" style={{ padding: '1.5rem', background: 'var(--surface)' }}>

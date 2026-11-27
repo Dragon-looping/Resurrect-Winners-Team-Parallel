@@ -1,4 +1,4 @@
-import { GodownNode, PlannerOrder } from '../types/planner.ts';
+import type { GodownNode, PlannerOrder } from '../types/planner.ts';
 
 export const GODOWN_NODES: GodownNode[] = [
   { id: 'UDUPI', label: 'Udupi Central', kind: 'plant', x: 95, y: 125, stockSummary: '40 fans · 5 pumps' },

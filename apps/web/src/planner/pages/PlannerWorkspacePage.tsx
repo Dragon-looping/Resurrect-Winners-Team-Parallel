@@ -17,6 +17,7 @@ import { PlannerOffersPanel } from '../components/PlannerOffersPanel.tsx';
 import { GodownRouteMap } from '../components/GodownRouteMap.tsx';
 import { CutoffChallengePanel } from '../components/CutoffChallengePanel.tsx';
 import { OptionComparisonTable } from '../components/OptionComparisonTable.tsx';
+import { RecoveryApprovalPanel } from '../components/RecoveryApprovalPanel.tsx';
 import { AlertIcon, RotateCcwIcon } from '../../shared/icons.tsx';
 
 interface PlannerWorkspacePageProps {
@@ -207,6 +208,12 @@ export const PlannerWorkspacePage: React.FC<PlannerWorkspacePageProps> = ({
           <OptionComparisonTable
             order={activeOrder}
             onSelectCandidate={handleSelectCandidate}
+          />
+          <RecoveryApprovalPanel
+            order={activeOrder}
+            cutoffPreview={cutoffPreview}
+            onActionComplete={loadWorkspace}
+            onError={msg => setError(msg)}
           />
         </>
       )}

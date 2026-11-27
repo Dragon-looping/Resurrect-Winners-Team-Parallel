@@ -4,6 +4,8 @@ from app.schemas.event import (
     EventIngestionResponse,
     InventoryEventCreate,
     InventoryEventResponse,
+    PaginatedQuarantinedEventsResponse,
+    QuarantinedEventResponse,
 )
 from app.schemas.health import HealthResponse
 
@@ -12,4 +14,6 @@ __all__ = [
     "HealthResponse",
     "InventoryEventCreate",
     "InventoryEventResponse",
+    "PaginatedQuarantinedEventsResponse",
+    "QuarantinedEventResponse",
 ]

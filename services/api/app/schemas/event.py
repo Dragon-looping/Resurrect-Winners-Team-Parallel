@@ -81,3 +81,26 @@ class EventIngestionResponse(BaseModel):
     idempotent: bool = Field(default=False, description="True if event was already processed previously.")
     message: str
     event: InventoryEventResponse
+
+
+class QuarantinedEventResponse(BaseModel):
+    """Serialized representation of a quarantined invalid event."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    source: str | None
+    external_event_id: str | None
+    raw_payload: dict[str, Any]
+    failure_reason: str
+    error_details: list[dict[str, Any]] | dict[str, Any] | None
+    received_at: datetime
+
+
+class PaginatedQuarantinedEventsResponse(BaseModel):
+    """Paginated response wrapper for quarantined events."""
+
+    total: int
+    limit: int
+    offset: int
+    items: list[QuarantinedEventResponse]

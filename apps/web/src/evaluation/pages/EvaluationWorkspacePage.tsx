@@ -10,6 +10,7 @@ import { ParticipantInstructionsCard } from '../components/ParticipantInstructio
 import { TextBaselinePlanner } from '../components/TextBaselinePlanner.tsx';
 import { PostTrialCaptureDialog } from '../components/PostTrialCaptureDialog.tsx';
 import { StudyResultsSummaryPanel } from '../components/StudyResultsSummaryPanel.tsx';
+import { JudgeWalkthroughPanel } from '../components/JudgeWalkthroughPanel.tsx';
 import { GodownRouteMap } from '../../planner/components/GodownRouteMap.tsx';
 import { CutoffChallengePanel } from '../../planner/components/CutoffChallengePanel.tsx';
 import { OptionComparisonTable } from '../../planner/components/OptionComparisonTable.tsx';
@@ -178,6 +179,9 @@ export const EvaluationWorkspacePage: React.FC = () => {
           <span>Reset All Evaluation Data</span>
         </button>
       </div>
+
+      {/* Judge Walkthrough Script */}
+      <JudgeWalkthroughPanel />
 
       {/* Participant Protocol & Counterbalanced Session Controller */}
       {!activeTrial && (

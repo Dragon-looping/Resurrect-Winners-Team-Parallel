@@ -75,3 +75,10 @@ class PaginatedOrdersResponse(BaseModel):
     limit: int
     offset: int
     items: list[OrderResponse]
+
+
+class OrderStatusTransitionRequest(BaseModel):
+    """Request payload for transitioning an order's lifecycle status."""
+
+    to_status: OrderStatus
+    reason: str | None = Field(default=None, max_length=500)

@@ -4,10 +4,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.fulfilment.lifecycle import get_order_history, transition_order_status
 from app.fulfilment.orders import OrderError, create_order, get_order_by_id, list_orders
 from app.inventory.ingestion import EventValidationError
 from app.models.enums import OrderStatus
-from app.schemas.order import OrderCreate, OrderResponse, PaginatedOrdersResponse
+from app.schemas.order import (
+    OrderCreate,
+    OrderResponse,
+    OrderStatusHistoryResponse,
+    OrderStatusTransitionRequest,
+    PaginatedOrdersResponse,
+)
 
 router = APIRouter(tags=["Orders"])
 
@@ -78,3 +85,42 @@ def get_customer_order(
     except OrderError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
     return OrderResponse.model_validate(order)
+
+
+@router.get(
+    "/orders/{order_id}/history",
+    response_model=list[OrderStatusHistoryResponse],
+    summary="Get order status history",
+    description="Returns the chronological lifecycle transition history for an order.",
+)
+def get_customer_order_history(
+    order_id: int,
+    db: Session = Depends(get_db),
+) -> list[OrderStatusHistoryResponse]:
+    """Fetch status history for an order."""
+    try:
+        get_order_by_id(db, order_id)
+    except OrderError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
+    history = get_order_history(db, order_id)
+    return [OrderStatusHistoryResponse.model_validate(h) for h in history]
+
+
+@router.post(
+    "/orders/{order_id}/status",
+    response_model=OrderResponse,
+    summary="Transition order status",
+    description="Applies a validated lifecycle status transition and records audit history.",
+)
+def transition_customer_order_status(
+    order_id: int,
+    payload: OrderStatusTransitionRequest,
+    db: Session = Depends(get_db),
+) -> OrderResponse:
+    """Transition an order's lifecycle status."""
+    try:
+        order = get_order_by_id(db, order_id)
+        updated = transition_order_status(db, order, payload.to_status, reason=payload.reason)
+    except OrderError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
+    return OrderResponse.model_validate(updated)

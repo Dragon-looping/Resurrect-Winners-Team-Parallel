@@ -21,3 +21,43 @@ class FeedStatus(StrEnum):
     STALE = "STALE"
     DEGRADED = "DEGRADED"
     UNKNOWN = "UNKNOWN"
+
+
+class OrderStatus(StrEnum):
+    """Lifecycle states for a customer order."""
+
+    CREATED = "CREATED"
+    ALLOCATED = "ALLOCATED"
+    PARTIALLY_ALLOCATED = "PARTIALLY_ALLOCATED"
+    BACKLOGGED = "BACKLOGGED"
+    OFFER_SENT = "OFFER_SENT"
+    CONFIRMED = "CONFIRMED"
+    READY_FOR_DISPATCH = "READY_FOR_DISPATCH"
+    DISPATCHED = "DISPATCHED"
+    CANCELLED = "CANCELLED"
+
+
+class OfferStatus(StrEnum):
+    """Status values for customer delivery offers."""
+
+    PENDING = "PENDING"
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
+
+
+class PlanStatus(StrEnum):
+    """Status values for deterministic order plans."""
+
+    PREVIEW = "PREVIEW"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    EXPIRED = "EXPIRED"
+
+
+class ProductionBatchStatus(StrEnum):
+    """Status values for manufacturing production batches."""
+
+    PLANNED = "PLANNED"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"

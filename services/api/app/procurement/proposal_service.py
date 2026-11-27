@@ -353,3 +353,122 @@ async def generate_purchase_proposal(
     db.commit()
     db.refresh(proposal)
     return _to_proposal_response(db, proposal)
+
+
+def list_proposals(
+    db: Session,
+    *,
+    status_filter: ProposalStatus | None = None,
+) -> list[PurchaseProposalResponse]:
+    """List purchase proposals ordered newest-first, optionally filtered by status."""
+    stmt = select(PurchaseProposal)
+    if status_filter is not None:
+        stmt = stmt.where(PurchaseProposal.status == status_filter.value)
+    stmt = stmt.order_by(PurchaseProposal.created_at.desc(), PurchaseProposal.id.desc())
+    proposals = list(db.execute(stmt).scalars().all())
+    return [_to_proposal_response(db, p) for p in proposals]
+
+
+def get_proposal(db: Session, proposal_id: int) -> PurchaseProposalResponse:
+    """Retrieve a single purchase proposal by ID."""
+    proposal = db.execute(
+        select(PurchaseProposal).where(PurchaseProposal.id == proposal_id)
+    ).scalar_one_or_none()
+    if proposal is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Purchase proposal {proposal_id} not found.",
+        )
+    return _to_proposal_response(db, proposal)
+
+
+def submit_proposal_for_approval(
+    db: Session,
+    proposal_id: int,
+    *,
+    expected_version: int,
+    actor: ActorContext,
+    notes: str | None = None,
+) -> PurchaseProposalResponse:
+    """Transition a DRAFT proposal to PENDING_APPROVAL for human review."""
+    proposal = db.execute(
+        select(PurchaseProposal).where(PurchaseProposal.id == proposal_id)
+    ).scalar_one_or_none()
+    if proposal is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Purchase proposal {proposal_id} not found.",
+        )
+    if proposal.version != expected_version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Version conflict on proposal {proposal.proposal_code}: expected {expected_version}, found {proposal.version}.",
+        )
+    if proposal.status != ProposalStatus.DRAFT.value:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Proposal {proposal.proposal_code} cannot be submitted from status '{proposal.status}'.",
+        )
+
+    proposal.status = ProposalStatus.PENDING_APPROVAL.value
+    proposal.version += 1
+    proposal.submitted_by = actor.actor_id
+    proposal.submitted_at = datetime.now(timezone.utc)
+
+    record_audit_log(
+        db,
+        entity_type="PROPOSAL",
+        entity_id=proposal.proposal_code,
+        action="PROPOSAL_SUBMITTED",
+        actor_id=actor.actor_id,
+        actor_role=actor.role.value,
+        details={"notes": notes or "", "new_version": proposal.version},
+    )
+    db.commit()
+    db.refresh(proposal)
+    return _to_proposal_response(db, proposal)
+
+
+def cancel_proposal(
+    db: Session,
+    proposal_id: int,
+    *,
+    expected_version: int,
+    actor: ActorContext,
+    reason: str | None = None,
+) -> PurchaseProposalResponse:
+    """Cancel a DRAFT or PENDING_APPROVAL purchase proposal."""
+    proposal = db.execute(
+        select(PurchaseProposal).where(PurchaseProposal.id == proposal_id)
+    ).scalar_one_or_none()
+    if proposal is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Purchase proposal {proposal_id} not found.",
+        )
+    if proposal.version != expected_version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Version conflict on proposal {proposal.proposal_code}: expected {expected_version}, found {proposal.version}.",
+        )
+    if proposal.status not in {ProposalStatus.DRAFT.value, ProposalStatus.PENDING_APPROVAL.value}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Proposal {proposal.proposal_code} cannot be cancelled from status '{proposal.status}'.",
+        )
+
+    proposal.status = ProposalStatus.CANCELLED.value
+    proposal.version += 1
+
+    record_audit_log(
+        db,
+        entity_type="PROPOSAL",
+        entity_id=proposal.proposal_code,
+        action="PROPOSAL_CANCELLED",
+        actor_id=actor.actor_id,
+        actor_role=actor.role.value,
+        details={"reason": reason or "Cancelled by operator", "new_version": proposal.version},
+    )
+    db.commit()
+    db.refresh(proposal)
+    return _to_proposal_response(db, proposal)

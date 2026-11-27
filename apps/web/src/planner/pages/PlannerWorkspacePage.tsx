@@ -7,9 +7,11 @@ import {
 } from '../adapters/plannerAdapter.ts';
 import {
   PlannerIntakeRequest,
-  PlannerOrder
+  PlannerOrder,
+  TelemetrySnapshot
 } from '../types/planner.ts';
 import { OrderQueuePanel } from '../components/OrderQueuePanel.tsx';
+import { TelemetryStrip } from '../components/TelemetryStrip.tsx';
 import { AlertIcon, RotateCcwIcon } from '../../shared/icons.tsx';
 
 interface PlannerWorkspacePageProps {
@@ -23,6 +25,8 @@ export const PlannerWorkspacePage: React.FC<PlannerWorkspacePageProps> = ({
 }) => {
   const [orders, setOrders] = useState<PlannerOrder[]>([]);
   const [activeOrder, setActiveOrder] = useState<PlannerOrder | null>(null);
+  const [liveTelemetry, setLiveTelemetry] = useState<TelemetrySnapshot | null>(null);
+  const [streamError, setStreamError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState(getPlannerConfig());
 
@@ -36,6 +40,7 @@ export const PlannerWorkspacePage: React.FC<PlannerWorkspacePageProps> = ({
       ]);
       setOrders(list);
       setActiveOrder(current);
+      setLiveTelemetry(current.telemetry);
     } catch (err: any) {
       setError(err.message || 'Failed to load planner workspace.');
     }
@@ -44,6 +49,17 @@ export const PlannerWorkspacePage: React.FC<PlannerWorkspacePageProps> = ({
   useEffect(() => {
     loadWorkspace();
   }, [loadWorkspace]);
+
+  useEffect(() => {
+    setStreamError(null);
+    const adapter = getPlannerAdapter();
+    const unsubscribe = adapter.subscribeTelemetryStream(
+      orderId,
+      snapshot => setLiveTelemetry(snapshot),
+      msg => setStreamError(msg)
+    );
+    return unsubscribe;
+  }, [orderId, config.mode]);
 
   const toggleMode = (mode: 'fixture' | 'live') => {
     setPlannerConfig({ mode });
@@ -136,11 +152,11 @@ export const PlannerWorkspacePage: React.FC<PlannerWorkspacePageProps> = ({
       />
 
       {activeOrder && (
-        <div className="ruled-box" style={{ padding: '1.25rem' }}>
-          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--ink-muted)' }}>
-            Inspecting {activeOrder.orderId} ({activeOrder.quantity} {activeOrder.unitLabel} · {activeOrder.itemSku} → {activeOrder.destination}).
-          </p>
-        </div>
+        <TelemetryStrip
+          order={activeOrder}
+          telemetry={liveTelemetry || activeOrder.telemetry}
+          streamError={streamError}
+        />
       )}
     </div>
   );

@@ -86,7 +86,7 @@ def test_full_demo_scenario_end_to_end(client: TestClient, db_session: Session) 
     assert client.get("/events/quarantined").json()["total"] == 1
 
     # 7. A feed becomes stale after its configured timeout
-    hb_time = datetime(2026, 11, 27, 10, 0, 0, tzinfo=timezone.utc)
+    hb_time = datetime.now(timezone.utc)
     assert client.post(
         "/feeds/heartbeat",
         json={

@@ -61,3 +61,18 @@ class ProductionBatchStatus(StrEnum):
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
+
+
+class RecoveryType(StrEnum):
+    """Types of godown stock recovery."""
+
+    SURPLUS_TRANSFER = "SURPLUS_TRANSFER"
+    ORDER_SWAP = "ORDER_SWAP"
+
+
+class RecoveryStatus(StrEnum):
+    """Approval lifecycle status for a recovery plan."""
+
+    PREVIEW = "PREVIEW"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"

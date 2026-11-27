@@ -68,11 +68,23 @@ export const Layout: React.FC<LayoutProps> = ({
                 paddingBottom: '2px'
               }}
             >
-              {orderRef ? `Order Portal (${orderRef})` : 'Order Portal (Sample)'}
+              {orderRef && activeRoute.startsWith('/customer/orders') ? `Order Portal (${orderRef})` : 'Order Portal (Sample)'}
+            </button>
+            <button
+              onClick={() => onNavigate && onNavigate(orderRef ? `/planner/orders/${orderRef}` : '/planner')}
+              style={{
+                textDecoration: 'none',
+                fontWeight: activeRoute.startsWith('/planner') ? 600 : 400,
+                color: activeRoute.startsWith('/planner') ? 'var(--oxide-red)' : 'var(--ink-secondary)',
+                borderBottom: activeRoute.startsWith('/planner') ? '2px solid var(--oxide-red)' : '2px solid transparent',
+                paddingBottom: '2px'
+              }}
+            >
+              Planner Workspace
             </button>
           </div>
           <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-faint)', fontSize: '0.75rem' }}>
-            BRANCH 1: CUSTOMER PORTAL
+            {activeRoute.startsWith('/planner') ? 'BRANCH 2: PLANNER WORKSPACE' : 'BRANCH 1: CUSTOMER PORTAL'}
           </div>
         </div>
       </nav>

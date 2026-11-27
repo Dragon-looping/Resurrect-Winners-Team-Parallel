@@ -7,6 +7,8 @@ from app.models.enums import (
     OrderStatus,
     PlanStatus,
     ProductionBatchStatus,
+    RecoveryStatus,
+    RecoveryType,
 )
 from app.models.feed_health import FeedHealth
 from app.models.inventory_balance import InventoryBalance
@@ -21,6 +23,7 @@ from app.models.order import (
 )
 from app.models.plant import Plant
 from app.models.quarantined_event import QuarantinedEvent
+from app.models.recovery import RecoveryAuditLog, RecoveryPlan, RecoveryRoute
 from app.models.sku import SKU
 
 __all__ = [
@@ -41,5 +44,10 @@ __all__ = [
     "ProductionBatch",
     "ProductionBatchStatus",
     "QuarantinedEvent",
+    "RecoveryAuditLog",
+    "RecoveryPlan",
+    "RecoveryRoute",
+    "RecoveryStatus",
+    "RecoveryType",
     "SKU",
 ]

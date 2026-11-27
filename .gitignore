@@ -19,3 +19,16 @@ node_modules
 dist
 .DS_Store
 *.local
+
+# Python / API service
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.env
+.env.*
+!.env.example

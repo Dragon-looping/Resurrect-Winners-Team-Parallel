@@ -25,6 +25,16 @@ from app.schemas.production import (
     ProductionBatchCreate,
     ProductionBatchResponse,
 )
+from app.schemas.recovery import (
+    RecoveryAlternativesResponse,
+    RecoveryApproveRequest,
+    RecoveryAuditLogResponse,
+    RecoveryOptionItem,
+    RecoveryPlanResponse,
+    RecoveryPreviewRequest,
+    RecoverySearchRequest,
+    RecoverySearchResponse,
+)
 from app.schemas.replay import ReplayBalanceItem, ReplayResponse
 from app.schemas.stock import StockItemResponse, StockListResponse
 
@@ -53,6 +63,14 @@ __all__ = [
     "ProductionBatchCreate",
     "ProductionBatchResponse",
     "QuarantinedEventResponse",
+    "RecoveryAlternativesResponse",
+    "RecoveryApproveRequest",
+    "RecoveryAuditLogResponse",
+    "RecoveryOptionItem",
+    "RecoveryPlanResponse",
+    "RecoveryPreviewRequest",
+    "RecoverySearchRequest",
+    "RecoverySearchResponse",
     "ReplayBalanceItem",
     "ReplayResponse",
     "StockItemResponse",

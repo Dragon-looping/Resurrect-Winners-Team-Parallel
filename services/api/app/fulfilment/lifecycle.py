@@ -38,6 +38,7 @@ ALLOWED_TRANSITIONS: dict[OrderStatus, set[OrderStatus]] = {
     },
     OrderStatus.ALLOCATED: {
         OrderStatus.CONFIRMED,
+        OrderStatus.PARTIALLY_ALLOCATED,
         OrderStatus.READY_FOR_DISPATCH,
         OrderStatus.BACKLOGGED,
         OrderStatus.CANCELLED,

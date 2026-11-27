@@ -16,6 +16,7 @@ import { TelemetryStrip } from '../components/TelemetryStrip.tsx';
 import { PlannerOffersPanel } from '../components/PlannerOffersPanel.tsx';
 import { GodownRouteMap } from '../components/GodownRouteMap.tsx';
 import { CutoffChallengePanel } from '../components/CutoffChallengePanel.tsx';
+import { OptionComparisonTable } from '../components/OptionComparisonTable.tsx';
 import { AlertIcon, RotateCcwIcon } from '../../shared/icons.tsx';
 
 interface PlannerWorkspacePageProps {
@@ -202,6 +203,10 @@ export const PlannerWorkspacePage: React.FC<PlannerWorkspacePageProps> = ({
             preview={cutoffPreview}
             onPreviewCutoff={handlePreviewCutoff}
             isPreviewing={isPreviewing}
+          />
+          <OptionComparisonTable
+            order={activeOrder}
+            onSelectCandidate={handleSelectCandidate}
           />
         </>
       )}

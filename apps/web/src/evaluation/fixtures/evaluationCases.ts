@@ -1,4 +1,4 @@
-import { EvaluationCase } from '../types/evaluation.ts';
+import type { EvaluationCase } from '../types/evaluation.ts';
 
 export const EVALUATION_CASES: Record<'EVAL-CASE-A' | 'EVAL-CASE-B', EvaluationCase> = {
   'EVAL-CASE-A': {

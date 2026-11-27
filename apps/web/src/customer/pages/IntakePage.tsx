@@ -1,0 +1,482 @@
+import React, { useState } from 'react';
+import { getOrderAdapter, getAdapterConfig, setAdapterConfig, resetFixtureData } from '../adapters/orderAdapter.ts';
+import { DeliveryRequest } from '../types/order.ts';
+import { AlertIcon, ArrowRightIcon, CheckIcon, RotateCcwIcon } from '../../shared/icons.tsx';
+import { PRODUCT_CATALOG, findCatalogItem } from '../fixtures/catalog.ts';
+
+interface IntakePageProps {
+  onNavigate: (route: string) => void;
+}
+
+interface FormErrors {
+  itemSku?: string;
+  quantity?: string;
+  destination?: string;
+  requestedArrivalDate?: string;
+  general?: string;
+}
+
+const DEFAULT_SKU = 'FAN-HV-24-IND';
+const defaultCatalogItem = findCatalogItem(DEFAULT_SKU)!;
+
+function makeDefaultForm(sku: string): DeliveryRequest {
+  const item = findCatalogItem(sku) || defaultCatalogItem;
+  return {
+    itemSku: item.sku,
+    itemName: item.name,
+    quantity: item.defaultQuantity,
+    destination: item.defaultDestination,
+    requestedArrivalDate: '2026-11-27',
+    mustArriveTogether: false,
+    notes: ''
+  };
+}
+
+export const IntakePage: React.FC<IntakePageProps> = ({ onNavigate }) => {
+  const [formData, setFormData] = useState<DeliveryRequest>(makeDefaultForm(DEFAULT_SKU));
+
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successLink, setSuccessLink] = useState<string | null>(null);
+  const [adapterConfig, setConfig] = useState(getAdapterConfig());
+
+  const handleInputChange = (field: keyof DeliveryRequest, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field as keyof FormErrors]) {
+      setErrors(prev => ({ ...prev, [field]: undefined }));
+    }
+  };
+
+  // When the user picks a SKU from the catalog selector, auto-fill name + defaults
+  const handleSkuSelect = (sku: string) => {
+    const item = findCatalogItem(sku);
+    if (item) {
+      setFormData(prev => ({
+        ...prev,
+        itemSku: item.sku,
+        itemName: item.name,
+        quantity: item.defaultQuantity,
+        destination: item.defaultDestination
+      }));
+      setErrors(prev => ({ ...prev, itemSku: undefined }));
+    } else {
+      setFormData(prev => ({ ...prev, itemSku: sku }));
+    }
+  };
+
+  const validate = (): boolean => {
+    const errs: FormErrors = {};
+    if (!formData.itemSku.trim()) {
+      errs.itemSku = 'Equipment SKU / model identifier is required.';
+    }
+    if (!formData.quantity || formData.quantity <= 0 || !Number.isInteger(Number(formData.quantity))) {
+      errs.quantity = 'Quantity must be a positive whole number.';
+    }
+    if (!formData.destination.trim()) {
+      errs.destination = 'Delivery destination address is required.';
+    }
+    if (!formData.requestedArrivalDate) {
+      errs.requestedArrivalDate = 'Requested arrival date is required.';
+    }
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validate()) return;
+
+    setIsSubmitting(true);
+    setErrors({});
+    try {
+      const adapter = getOrderAdapter();
+      const order = await adapter.createOrder(formData);
+      setSuccessLink(`/customer/orders/${order.orderId}`);
+      onNavigate(`/customer/orders/${order.orderId}`);
+    } catch (err: any) {
+      setErrors({
+        general: err.message || 'Failed to submit delivery request. Verify backend connection.'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const toggleAdapterMode = (mode: 'fixture' | 'live') => {
+    setAdapterConfig({ mode });
+    setConfig(getAdapterConfig());
+  };
+
+  const handleReset = () => {
+    resetFixtureData();
+    setFormData(makeDefaultForm(DEFAULT_SKU));
+    setErrors({});
+    setSuccessLink(null);
+  };
+
+  // Derive current catalog item for inline description
+  const currentCatalogItem = findCatalogItem(formData.itemSku);
+
+  return (
+    <div style={{ maxWidth: '780px', margin: '0 auto' }}>
+      <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--rule)', paddingBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>
+              Document Ref: REQ-INTAKE-FORM · Udupi Logistics Hub
+            </p>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', fontWeight: 700, letterSpacing: '0.02em', lineHeight: 1.1, textTransform: 'uppercase' }}>
+              Request a delivery
+            </h1>
+          </div>
+          
+          <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--rule)', background: 'var(--surface)', padding: '0.25rem', fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }}>
+            <span style={{ padding: '0.2rem 0.5rem', color: 'var(--ink-muted)' }}>MODE:</span>
+            <button
+              type="button"
+              onClick={() => toggleAdapterMode('fixture')}
+              style={{
+                padding: '0.25rem 0.6rem',
+                background: adapterConfig.mode === 'fixture' ? 'var(--ink)' : 'transparent',
+                color: adapterConfig.mode === 'fixture' ? 'var(--surface)' : 'var(--ink)',
+                fontWeight: adapterConfig.mode === 'fixture' ? 600 : 400
+              }}
+            >
+              FIXTURE
+            </button>
+            <button
+              type="button"
+              onClick={() => toggleAdapterMode('live')}
+              style={{
+                padding: '0.25rem 0.6rem',
+                background: adapterConfig.mode === 'live' ? 'var(--oxide-red)' : 'transparent',
+                color: adapterConfig.mode === 'live' ? 'var(--surface)' : 'var(--ink)',
+                fontWeight: adapterConfig.mode === 'live' ? 600 : 400
+              }}
+            >
+              LIVE API
+            </button>
+          </div>
+        </div>
+        
+        <p style={{ marginTop: '0.75rem', color: 'var(--ink-secondary)', fontSize: '1rem', maxWidth: '640px' }}>
+          Specify equipment and required destination. The dispatch engine evaluates stock positions across regional depots.
+        </p>
+      </div>
+
+      {errors.general && (
+        <div style={{ padding: '1rem', background: 'var(--oxide-red-subtle)', border: '1px solid var(--oxide-red)', color: 'var(--oxide-red)', marginBottom: '1.5rem', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <AlertIcon size={20} color="var(--oxide-red)" />
+          <div>
+            <strong>Submission Rejected:</strong> {errors.general}
+          </div>
+        </div>
+      )}
+
+      {successLink && (
+        <div style={{ padding: '1rem', background: 'var(--forest-green-subtle)', border: '1px solid var(--forest-green)', color: 'var(--forest-green)', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <CheckIcon size={20} color="var(--forest-green)" />
+            <span>Order registered in dispatch pipeline.</span>
+          </div>
+          <button 
+            type="button" 
+            className="btn-primary" 
+            style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+            onClick={() => onNavigate(successLink)}
+          >
+            Open Order Manifest →
+          </button>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} noValidate>
+        <div className="ruled-box" style={{ padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          
+          {/* SKU Selector */}
+          <div>
+            <label htmlFor="skuSelect" style={{ display: 'block', fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.35rem' }}>
+              Orderable Item <span style={{ color: 'var(--oxide-red)' }}>*</span>
+            </label>
+            <select
+              id="skuSelect"
+              value={formData.itemSku}
+              onChange={(e) => handleSkuSelect(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.65rem 0.75rem',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.95rem',
+                border: errors.itemSku ? '1px solid var(--oxide-red)' : '1px solid var(--rule-dark)',
+                background: 'var(--surface)',
+                color: 'var(--ink)',
+                appearance: 'auto'
+              }}
+            >
+              {PRODUCT_CATALOG.map(item => (
+                <option key={item.sku} value={item.sku}>
+                  {item.sku} — {item.name}
+                </option>
+              ))}
+              {!PRODUCT_CATALOG.find(i => i.sku === formData.itemSku) && (
+                <option value={formData.itemSku}>{formData.itemSku} (custom / unknown SKU)</option>
+              )}
+            </select>
+            <div style={{ marginTop: '0.35rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', flexWrap: 'wrap', gap: '0.25rem' }}>
+              <span style={{ color: 'var(--ink-muted)' }}>
+                {currentCatalogItem
+                  ? `${currentCatalogItem.category} · Origin: ${currentCatalogItem.standardOrigin}`
+                  : 'Unknown SKU — backend will validate on submission'}
+              </span>
+              {errors.itemSku && (
+                <span style={{ color: 'var(--oxide-red)', fontWeight: 500 }}>{errors.itemSku}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Item name (read-only display / manual override) */}
+          <div>
+            <label htmlFor="itemName" style={{ display: 'block', fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.35rem' }}>
+              Item Description
+            </label>
+            <input
+              id="itemName"
+              type="text"
+              value={formData.itemName || ''}
+              onChange={(e) => handleInputChange('itemName', e.target.value)}
+              placeholder="Auto-filled from SKU selection"
+              style={{
+                width: '100%',
+                padding: '0.65rem 0.75rem',
+                fontSize: '0.95rem',
+                border: '1px solid var(--rule-dark)',
+                background: 'var(--surface)',
+                color: 'var(--ink)'
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
+            <div>
+              <label htmlFor="quantity" style={{ display: 'block', fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.35rem' }}>
+                Quantity (Units) <span style={{ color: 'var(--oxide-red)' }}>*</span>
+              </label>
+              <input
+                id="quantity"
+                type="number"
+                min="1"
+                step="1"
+                value={formData.quantity}
+                onChange={(e) => handleInputChange('quantity', parseInt(e.target.value, 10) || 0)}
+                className="tabular"
+                style={{
+                  width: '100%',
+                  padding: '0.65rem 0.75rem',
+                  fontSize: '1.1rem',
+                  fontWeight: 600,
+                  border: errors.quantity ? '1px solid var(--oxide-red)' : '1px solid var(--rule-dark)',
+                  background: 'var(--surface)',
+                  color: 'var(--ink)'
+                }}
+              />
+              {currentCatalogItem && (
+                <div style={{ marginTop: '0.35rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>Quick preset:</span>
+                  <button
+                    type="button"
+                    onClick={() => handleInputChange('quantity', currentCatalogItem.defaultQuantity)}
+                    style={{ fontSize: '0.75rem', padding: '0.1rem 0.4rem', border: '1px solid var(--rule)', background: formData.quantity === currentCatalogItem.defaultQuantity ? 'var(--surface-subtle)' : 'transparent' }}
+                  >
+                    {currentCatalogItem.defaultQuantity} (default)
+                  </button>
+                </div>
+              )}
+              {errors.quantity && (
+                <p style={{ marginTop: '0.25rem', color: 'var(--oxide-red)', fontSize: '0.8rem', fontWeight: 500 }}>
+                  {errors.quantity}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="requestedArrivalDate" style={{ display: 'block', fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.35rem' }}>
+                Requested Arrival Date <span style={{ color: 'var(--oxide-red)' }}>*</span>
+              </label>
+              <input
+                id="requestedArrivalDate"
+                type="date"
+                value={formData.requestedArrivalDate}
+                onChange={(e) => handleInputChange('requestedArrivalDate', e.target.value)}
+                className="tabular"
+                style={{
+                  width: '100%',
+                  padding: '0.65rem 0.75rem',
+                  fontSize: '0.95rem',
+                  border: errors.requestedArrivalDate ? '1px solid var(--oxide-red)' : '1px solid var(--rule-dark)',
+                  background: 'var(--surface)',
+                  color: 'var(--ink)'
+                }}
+              />
+              <p style={{ marginTop: '0.35rem', color: 'var(--ink-muted)', fontSize: '0.8rem' }}>
+                Benchmark: Friday, Nov 27, 2026
+              </p>
+              {errors.requestedArrivalDate && (
+                <p style={{ marginTop: '0.25rem', color: 'var(--oxide-red)', fontSize: '0.8rem', fontWeight: 500 }}>
+                  {errors.requestedArrivalDate}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="destination" style={{ display: 'block', fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.35rem' }}>
+              Destination Address / Outlet <span style={{ color: 'var(--oxide-red)' }}>*</span>
+            </label>
+            <input
+              id="destination"
+              type="text"
+              value={formData.destination}
+              onChange={(e) => handleInputChange('destination', e.target.value)}
+              placeholder="e.g. Manipal Commercial Center, Shop #14"
+              style={{
+                width: '100%',
+                padding: '0.65rem 0.75rem',
+                fontSize: '0.95rem',
+                border: errors.destination ? '1px solid var(--oxide-red)' : '1px solid var(--rule-dark)',
+                background: 'var(--surface)',
+                color: 'var(--ink)'
+              }}
+            />
+            {errors.destination && (
+              <p style={{ marginTop: '0.25rem', color: 'var(--oxide-red)', fontSize: '0.8rem', fontWeight: 500 }}>
+                {errors.destination}
+              </p>
+            )}
+          </div>
+
+          <div style={{ background: 'var(--surface-subtle)', padding: '1rem', border: '1px solid var(--rule)' }}>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={formData.mustArriveTogether}
+                onChange={(e) => handleInputChange('mustArriveTogether', e.target.checked)}
+                style={{ marginTop: '0.2rem', accentColor: 'var(--oxide-red)', width: '18px', height: '18px' }}
+              />
+              <div>
+                <span style={{ fontWeight: 600, color: 'var(--ink)' }}>
+                  Strict Single Delivery Requirement
+                </span>
+                <p style={{ fontSize: '0.85rem', color: 'var(--ink-secondary)', marginTop: '0.2rem' }}>
+                  If selected, all units must arrive together in one single consignment. If regional warehouse stock is insufficient, split alternatives will require explicit customer override.
+                </p>
+              </div>
+            </label>
+          </div>
+
+          <div>
+            <label htmlFor="notes" style={{ display: 'block', fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.35rem' }}>
+              Customer Fulfilment Instructions / Phrasing (Optional)
+            </label>
+            <textarea
+              id="notes"
+              rows={2}
+              value={formData.notes || ''}
+              onChange={(e) => handleInputChange('notes', e.target.value)}
+              placeholder="e.g. Required for university exhibition opening. Test ambiguous timing by including 'ambiguous'."
+              style={{
+                width: '100%',
+                padding: '0.65rem 0.75rem',
+                fontSize: '0.9rem',
+                border: '1px solid var(--rule-dark)',
+                background: 'var(--surface)',
+                color: 'var(--ink)',
+                resize: 'vertical'
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1rem', borderTop: '1px solid var(--rule)', flexWrap: 'wrap', gap: '1rem' }}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={handleReset}
+              style={{ fontSize: '0.85rem' }}
+            >
+              <RotateCcwIcon size={14} />
+              Reset Defaults
+            </button>
+
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={isSubmitting}
+              style={{ minWidth: '220px' }}
+            >
+              {isSubmitting ? (
+                <span>Evaluating Warehouse Stock...</span>
+              ) : (
+                <>
+                  <span>Submit Delivery Request</span>
+                  <ArrowRightIcon size={16} />
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <div style={{ marginTop: '2.5rem', borderTop: '1px dashed var(--rule-dark)', paddingTop: '1.5rem' }}>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--ink-muted)', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
+          Direct Test Fixtures &amp; Hackathon Scenarios:
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', fontSize: '0.85rem' }}>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => onNavigate('/customer/orders/ORD-2026-MANIPAL-50')}
+            style={{ textAlign: 'left', padding: '0.6rem 0.75rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
+          >
+            <span style={{ fontWeight: 600 }}>1. Fans — Split Offer</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>40 on Fri / 10 on Sun · Manipal</span>
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => onNavigate('/customer/orders/ORD-2026-MANIPAL-CLARIFY')}
+            style={{ textAlign: 'left', padding: '0.6rem 0.75rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
+          >
+            <span style={{ fontWeight: 600 }}>2. Clarification Inline</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>Arrival vs dispatch date</span>
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => onNavigate('/customer/orders/ORD-2026-MANIPAL-LATER')}
+            style={{ textAlign: 'left', padding: '0.6rem 0.75rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
+          >
+            <span style={{ fontWeight: 600 }}>3. Later Single Delivery</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>50 fans on Tue, Dec 01</span>
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => onNavigate('/customer/orders/ORD-2026-MANIPAL-CONFIRMED-SPLIT')}
+            style={{ textAlign: 'left', padding: '0.6rem 0.75rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
+          >
+            <span style={{ fontWeight: 600 }}>4. Confirmed Schedule</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>2 shipments booked · fans</span>
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => onNavigate('/customer/orders/ORD-2026-BRAHMAVAR-20-PUMP')}
+            style={{ textAlign: 'left', padding: '0.6rem 0.75rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
+          >
+            <span style={{ fontWeight: 600 }}>5. Pumps — Split Offer</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>15 on Fri / 5 on Sun · Brahmavar</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};

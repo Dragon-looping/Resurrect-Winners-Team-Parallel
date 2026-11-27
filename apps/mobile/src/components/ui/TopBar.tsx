@@ -8,7 +8,14 @@ import { BadgeVariant, StatusBadge } from './StatusBadge';
 const LOGO_SOURCE = require('../../../assets/setuvyuha-logo.png');
 
 export const MainTopBar: React.FC = () => {
-  const { isOffline, pendingAndFailedCount, toggleOffline, navigate } = useApp();
+  const {
+    isOffline,
+    pendingAndFailedCount,
+    isDevSession,
+    toggleOffline,
+    navigate,
+    signOut,
+  } = useApp();
 
   const badgeLabel = isOffline
     ? `Offline · ${pendingAndFailedCount} Pending`
@@ -32,17 +39,37 @@ export const MainTopBar: React.FC = () => {
       >
         <Image source={LOGO_SOURCE} style={styles.logo} resizeMode="contain" />
       </Pressable>
-      <Pressable
-        onPress={toggleOffline}
-        accessibilityRole="button"
-        accessibilityLabel="Toggle connectivity status"
-      >
-        <StatusBadge
-          label={badgeLabel}
-          variant={badgeVariant}
-          icon={isOffline ? 'cloud-off' : 'cloud-done'}
-        />
-      </Pressable>
+      <View style={styles.mainRight}>
+        {isDevSession && (
+          <StatusBadge label="DEV MODE" variant="warning" />
+        )}
+        <Pressable
+          onPress={toggleOffline}
+          accessibilityRole="button"
+          accessibilityLabel="Toggle connectivity status"
+        >
+          <StatusBadge
+            label={badgeLabel}
+            variant={badgeVariant}
+            icon={isOffline ? 'cloud-off' : 'cloud-done'}
+          />
+        </Pressable>
+        <Pressable
+          onPress={signOut}
+          accessibilityRole="button"
+          accessibilityLabel={isDevSession ? 'Exit Development Mode' : 'Sign out'}
+          style={({ pressed }) => [
+            styles.exitBtn,
+            pressed && styles.exitBtnPressed,
+          ]}
+        >
+          <MaterialIcons
+            name="logout"
+            size={18}
+            color={Colors.inverseOnSurface}
+          />
+        </Pressable>
+      </View>
     </View>
   );
 };
@@ -66,6 +93,7 @@ export const SubScreenTopBar: React.FC<SubScreenTopBarProps> = ({
   badgeDot,
   onBack,
 }) => {
+  const { isDevSession } = useApp();
   return (
     <View style={styles.subHeader}>
       <View style={styles.subLeft}>
@@ -89,12 +117,15 @@ export const SubScreenTopBar: React.FC<SubScreenTopBarProps> = ({
           </Text>
         </View>
       </View>
-      <StatusBadge
-        label={badgeLabel}
-        variant={badgeVariant}
-        icon={badgeIcon}
-        dot={badgeDot}
-      />
+      <View style={styles.subRight}>
+        {isDevSession && <StatusBadge label="DEV MODE" variant="warning" />}
+        <StatusBadge
+          label={badgeLabel}
+          variant={badgeVariant}
+          icon={badgeIcon}
+          dot={badgeDot}
+        />
+      </View>
     </View>
   );
 };
@@ -114,10 +145,35 @@ const styles = StyleSheet.create({
   },
   logoWrap: {
     justifyContent: 'center',
+    flexShrink: 1,
   },
   logo: {
-    width: 144,
-    height: 32,
+    width: 124,
+    height: 28,
+  },
+  mainRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.gutterXs,
+    flexShrink: 0,
+  },
+  exitBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: Radii.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(246, 245, 240, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exitBtnPressed: {
+    backgroundColor: 'rgba(246, 245, 240, 0.12)',
+  },
+  subRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.gutterXs,
+    flexShrink: 0,
   },
   subHeader: {
     backgroundColor: Colors.surface,

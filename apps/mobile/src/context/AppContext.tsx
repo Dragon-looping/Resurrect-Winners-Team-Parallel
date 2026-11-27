@@ -11,7 +11,7 @@ import {
 } from '../types/inventory';
 import { SEED_EVENTS, SEED_INBOUND_SHIPMENTS, SEED_PLANTS, SEED_SKUS } from '../data/seedFixtures';
 import { authService, AuthResult } from '../services/authService';
-import { isApiConfigured } from '../services/config';
+import { isApiConfigured, isDevModeEnabled } from '../services/config';
 import {
   formatIstTime,
   formatShortIstTime,
@@ -43,6 +43,7 @@ interface AppContextValue {
   isHydrated: boolean;
   user: AuthUser | null;
   isAuthenticated: boolean;
+  isDevSession: boolean;
   currentScreen: ScreenName;
   screenHistory: ScreenName[];
   selectedEventId: string;
@@ -68,6 +69,7 @@ interface AppContextValue {
   toggleOffline: () => void;
 
   signIn: (email: string, password: string) => Promise<AuthResult>;
+  enterDevMode: () => Promise<void>;
   signOut: () => Promise<void>;
 
   recordOperation: (payload: RecordOperationPayload) => Promise<InventoryEvent>;
@@ -115,8 +117,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (savedSku) setActiveSkuId(savedSku);
         if (savedUser) {
           const parsedUser = JSON.parse(savedUser) as AuthUser;
-          setUser(parsedUser);
-          setCurrentScreen('Dashboard');
+          if (!parsedUser.isDevMode || isDevModeEnabled()) {
+            setUser(parsedUser);
+            setCurrentScreen('Dashboard');
+          }
         }
       } catch {
         // Fallback to seed fixtures on storage read error
@@ -234,6 +238,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCurrentScreen('Dashboard');
     }
     return result;
+  }, []);
+
+  const enterDevMode = useCallback(async () => {
+    if (!isDevModeEnabled()) return;
+    const devUser: AuthUser = {
+      email: 'dev-session@local',
+      name: 'Development Session',
+      role: 'Local Dev Operator',
+      isDevMode: true,
+    };
+    setUser(devUser);
+    await AsyncStorage.setItem(STORAGE_KEYS.authUser, JSON.stringify(devUser)).catch(() => {});
+    setScreenHistory([]);
+    setCurrentScreen('Dashboard');
   }, []);
 
   const signOut = useCallback(async () => {
@@ -398,6 +416,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isHydrated,
     user,
     isAuthenticated: Boolean(user),
+    isDevSession: Boolean(user?.isDevMode),
     currentScreen,
     screenHistory,
     selectedEventId,
@@ -420,6 +439,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     selectSku,
     toggleOffline,
     signIn,
+    enterDevMode,
     signOut,
     recordOperation,
     retryEvent,

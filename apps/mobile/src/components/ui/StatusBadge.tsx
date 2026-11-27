@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, FontFamily, Radii, Spacing } from '../../theme/tokens';
 
-export type BadgeVariant = 'success' | 'warning' | 'error' | 'neutral';
+export type BadgeVariant = 'success' | 'warning' | 'error' | 'neutral' | 'gold';
 
 interface StatusBadgeProps {
   label: string;
@@ -14,27 +14,37 @@ interface StatusBadgeProps {
 
 const VARIANT_STYLES: Record<
   BadgeVariant,
-  { bg: string; text: string; dotColor: string }
+  { bg: string; border: string; text: string; dotColor: string }
 > = {
   success: {
     bg: Colors.successContainer,
+    border: 'rgba(18, 61, 50, 0.18)',
     text: Colors.onSuccessContainer,
     dotColor: Colors.success,
   },
   warning: {
     bg: Colors.warningContainer,
+    border: 'rgba(133, 82, 0, 0.22)',
     text: Colors.onWarningContainer,
     dotColor: Colors.warning,
   },
   error: {
     bg: Colors.errorContainer,
+    border: 'rgba(158, 42, 43, 0.22)',
     text: Colors.onErrorContainer,
     dotColor: Colors.error,
   },
   neutral: {
     bg: Colors.surfaceContainerLow,
+    border: Colors.outlineVariant,
     text: Colors.onSurfaceVariant,
     dotColor: Colors.outline,
+  },
+  gold: {
+    bg: 'rgba(200, 162, 90, 0.16)',
+    border: Colors.antiqueGoldMuted,
+    text: Colors.antiqueGold,
+    dotColor: Colors.antiqueGold,
   },
 };
 
@@ -48,7 +58,10 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   return (
     <View
       accessibilityRole="text"
-      style={[styles.container, { backgroundColor: palette.bg }]}
+      style={[
+        styles.container,
+        { backgroundColor: palette.bg, borderColor: palette.border },
+      ]}
     >
       {dot && (
         <View style={[styles.dot, { backgroundColor: palette.dotColor }]} />
@@ -69,8 +82,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.gutterXs,
     paddingHorizontal: Spacing.gutterSm,
-    paddingVertical: Spacing.gutterXs,
+    paddingVertical: 3,
     borderRadius: Radii.sm,
+    borderWidth: 1,
     alignSelf: 'flex-start',
   },
   dot: {

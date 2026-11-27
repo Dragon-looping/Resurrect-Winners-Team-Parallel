@@ -20,6 +20,8 @@ const IS_DEV = typeof __DEV__ !== 'undefined' && __DEV__;
 
 export const DashboardScreen: React.FC = () => {
   const {
+    user,
+    isDevSession,
     activePlant,
     isPlantLocked,
     plantSkus,
@@ -28,7 +30,6 @@ export const DashboardScreen: React.FC = () => {
     events,
     isOffline,
     lastSyncIst,
-    heartbeatIst,
     feedHealth,
     isSyncingLiveData,
     liveDataError,
@@ -39,6 +40,90 @@ export const DashboardScreen: React.FC = () => {
     selectSku,
     refreshLiveData,
   } = useApp();
+
+  const roleLabel =
+    user?.role === 'WAREHOUSE_USER'
+      ? 'Warehouse Operator'
+      : user?.role ?? 'Warehouse Operator';
+
+  const syncSummary = useMemo(() => {
+    if (isOffline) {
+      return {
+        label:
+          pendingAndFailedCount > 0
+            ? `OFFLINE · ${pendingAndFailedCount} QUEUED`
+            : 'OFFLINE · SAVED LOCALLY',
+        subtext: `Last sync ${lastSyncIst}`,
+        icon: 'cloud-off' as const,
+        iconColor: Colors.warning,
+        textColor: Colors.onWarningContainer,
+      };
+    }
+    if (isSyncingLiveData) {
+      return {
+        label: 'SYNCING',
+        subtext: `Last sync ${lastSyncIst}`,
+        icon: 'sync' as const,
+        iconColor: Colors.primary,
+        textColor: Colors.onSurface,
+      };
+    }
+    if (liveDataError || failedCount > 0 || feedHealth?.status === 'DEGRADED') {
+      return {
+        label:
+          failedCount > 0
+            ? `SYNC FAILED · ${failedCount}`
+            : 'SYNC FAILED · CACHED',
+        subtext: `Last sync ${lastSyncIst}`,
+        icon: 'error-outline' as const,
+        iconColor: Colors.error,
+        textColor: Colors.onErrorContainer,
+      };
+    }
+    if (pendingAndFailedCount > 0) {
+      return {
+        label: `PENDING · ${pendingAndFailedCount} QUEUED`,
+        subtext: `Last sync ${lastSyncIst}`,
+        icon: 'schedule' as const,
+        iconColor: Colors.warning,
+        textColor: Colors.onWarningContainer,
+      };
+    }
+    if (dataSourceMode === 'demo') {
+      return {
+        label: 'DEMO · SAMPLE DATA',
+        subtext: 'Local fixtures active',
+        icon: 'info-outline' as const,
+        iconColor: Colors.onSurfaceVariant,
+        textColor: Colors.onSurfaceVariant,
+      };
+    }
+    if (dataSourceMode === 'cached') {
+      return {
+        label: 'CACHED',
+        subtext: `Last sync ${lastSyncIst}`,
+        icon: 'check-circle-outline' as const,
+        iconColor: Colors.success,
+        textColor: Colors.onSuccessContainer,
+      };
+    }
+    return {
+      label: 'SYNCED',
+      subtext: `Last sync ${lastSyncIst}`,
+      icon: 'check-circle-outline' as const,
+      iconColor: Colors.success,
+      textColor: Colors.onSuccessContainer,
+    };
+  }, [
+    isOffline,
+    isSyncingLiveData,
+    liveDataError,
+    failedCount,
+    pendingAndFailedCount,
+    feedHealth?.status,
+    dataSourceMode,
+    lastSyncIst,
+  ]);
 
   const [diagnosticsVisible, setDiagnosticsVisible] = useState(false);
 
@@ -87,94 +172,68 @@ export const DashboardScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.responsiveColumn}>
-          {/* Assigned-Plant Command Header & Feed Status */}
-          <View style={styles.card}>
+          {/* Warehouse Command Header */}
+          <View style={styles.commandCard}>
             <View style={styles.plantHeaderRow}>
               <View style={styles.plantInfo}>
-                <Text style={styles.eyebrow}>Assigned Manufacturing Plant</Text>
-                <Text style={styles.headlineMd}>
-                  {activePlant.id} · {activePlant.name}
+                <Text style={styles.commandEyebrow}>WAREHOUSE</Text>
+                <Text style={styles.commandTitle}>
+                  {activePlant.name}
                 </Text>
-                <Text style={styles.monoSub}>{activePlant.sublabel}</Text>
+                <Text style={styles.commandSub}>
+                  {activePlant.id} · {roleLabel}
+                </Text>
               </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  {dataSourceMode === 'demo' && (
-                    <StatusBadge label="DEMO" variant="warning" />
-                  )}
-                  {isPlantLocked ? (
-                    <StatusBadge label="Assigned" variant="success" />
-                  ) : (
-                    <Pressable
-                      onPress={() => navigate('PlantSkuSelection')}
-                      accessibilityRole="button"
-                      accessibilityLabel="Switch plant or SKU"
-                      style={({ pressed }) => [
-                        styles.switchBtn,
-                        pressed && styles.pressedSurface,
-                      ]}
-                    >
-                      <Text style={styles.switchBtnText}>Switch</Text>
-                    </Pressable>
-                  )}
-                </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {dataSourceMode === 'demo' && (
+                  <StatusBadge label="DEMO" variant="gold" />
+                )}
+                {isPlantLocked ? (
+                  <StatusBadge label="Assigned" variant="gold" dot />
+                ) : (
+                  <Pressable
+                    onPress={() => navigate('PlantSkuSelection')}
+                    accessibilityRole="button"
+                    accessibilityLabel="Switch warehouse or product"
+                    style={({ pressed }) => [
+                      styles.commandSwitchBtn,
+                      pressed && { opacity: 0.78 },
+                    ]}
+                  >
+                    <Text style={styles.commandSwitchText}>Switch</Text>
+                  </Pressable>
+                )}
+              </View>
             </View>
 
-            <View style={styles.feedDivider}>
+            <View style={styles.commandDivider}>
               <View style={styles.feedTopRow}>
                 <View style={styles.feedStatusRow}>
                   <MaterialIcons
-                    name={
-                      isOffline || feedHealth?.status === 'STALE'
-                        ? 'pause-circle-outline'
-                        : feedHealth?.status === 'DEGRADED'
-                          ? 'error-outline'
-                          : feedHealth?.status === 'HEALTHY'
-                            ? 'check-circle-outline'
-                            : 'help-outline'
-                    }
-                    size={16}
+                    name={syncSummary.icon}
+                    size={15}
                     color={
-                      isOffline || feedHealth?.status === 'STALE'
-                        ? Colors.warning
-                        : feedHealth?.status === 'DEGRADED'
-                          ? Colors.error
-                          : feedHealth?.status === 'HEALTHY'
-                            ? Colors.success
-                            : Colors.onSurfaceVariant
+                      isOffline || pendingAndFailedCount > 0
+                        ? Colors.antiqueGold
+                        : failedCount > 0 || liveDataError
+                          ? '#F9A8A8'
+                          : Colors.inversePrimary
                     }
                   />
-                  <Text
-                    style={[
-                      styles.feedStatusLabel,
-                      {
-                        color:
-                          isOffline || feedHealth?.status === 'STALE'
-                            ? Colors.onWarningContainer
-                            : feedHealth?.status === 'DEGRADED'
-                              ? Colors.onErrorContainer
-                              : feedHealth?.status === 'HEALTHY'
-                                ? Colors.onSuccessContainer
-                                : Colors.onSurfaceVariant,
-                      },
-                    ]}
-                  >
-                    {isOffline
-                      ? `Warehouse Feed Paused · ${dataSourceMode === 'demo' ? 'DEMO' : 'Offline'}`
-                      : feedHealth
-                        ? `Feed ${feedHealth.status}${feedHealth.isStale ? ' · Stale' : ''} (${feedHealth.source})`
-                        : `Feed UNKNOWN · ${dataSourceMode === 'cached' ? 'Cached' : 'DEMO'}`}
+                  <Text style={styles.commandSyncLabel}>
+                    {syncSummary.label}
                   </Text>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  {IS_DEV && (
+                  {IS_DEV && isDevSession && (
                     <Pressable onPress={() => setDiagnosticsVisible(true)} hitSlop={8}>
-                      <Text style={styles.primaryLink}>API Diag</Text>
+                      <Text style={styles.commandLinkGold}>API Diag</Text>
                     </Pressable>
                   )}
                   {!isOffline && (
                     <Pressable onPress={refreshLiveData} hitSlop={8}>
-                      <Text style={styles.primaryLink}>
-                        {isSyncingLiveData ? 'Syncing...' : 'Refresh'}
+                      <Text style={styles.commandLink}>
+                        {isSyncingLiveData ? 'Syncing...' : 'Sync'}
                       </Text>
                     </Pressable>
                   )}
@@ -182,29 +241,17 @@ export const DashboardScreen: React.FC = () => {
                     onPress={() => navigate('InventoryEventHistory')}
                     hitSlop={8}
                   >
-                    <Text style={styles.primaryLink}>
+                    <Text style={styles.commandLink}>
                       Queue ({pendingAndFailedCount})
                     </Text>
                   </Pressable>
                 </View>
               </View>
 
-              <View style={styles.feedMetaRow}>
-                <Text style={styles.monoSub}>
-                  Heartbeat: {feedHealth?.lastHeartbeatIst ?? (isOffline ? heartbeatIst : 'No signal')}
-                </Text>
-                <Text style={styles.monoSub}>
-                  Last event: {feedHealth?.lastEventIst ?? lastSyncIst}
-                </Text>
-              </View>
+              <Text style={styles.commandSub}>{syncSummary.subtext}</Text>
               {(feedHealth?.dataWarning || feedHealth?.lastErrorMessage) && (
-                <Text style={styles.staleNotice}>
+                <Text style={styles.commandWarn}>
                   {feedHealth.dataWarning ?? feedHealth.lastErrorMessage}
-                </Text>
-              )}
-              {isOffline && !feedHealth?.dataWarning && (
-                <Text style={styles.staleNotice}>
-                  Last usable update: {lastSyncIst}
                 </Text>
               )}
             </View>
@@ -235,32 +282,59 @@ export const DashboardScreen: React.FC = () => {
             />
           )}
 
-          {/* Stock & Queue Ledger Grid */}
+          {/* Stock Centerpiece */}
           <View style={styles.ledgerCard}>
-            <View style={styles.ledgerRowTop}>
-              <View style={[styles.ledgerCell, styles.ledgerCellLeft]}>
-                <Text style={styles.eyebrow}>On-Hand Stock</Text>
-                <Text style={styles.kpiValue}>
-                  {totals.onHand.toLocaleString()}
-                </Text>
-                <Text style={styles.monoSub}>
-                  {activePlant.godownLabel} · {totals.skuCount} SKUs
-                </Text>
+            <View style={styles.heroStockZone}>
+              <View style={styles.heroStockTop}>
+                <View style={{ gap: 2 }}>
+                  <Text style={styles.eyebrow}>AVAILABLE</Text>
+                  <Text style={styles.heroKpiValue}>
+                    {totals.netAvail.toLocaleString()}
+                  </Text>
+                  <Text style={styles.monoSub}>
+                    {totals.skuCount} SKUs · {activePlant.godownLabel}
+                  </Text>
+                </View>
+                <View style={styles.heroAvailBadge}>
+                  <Text style={styles.heroAvailPct}>
+                    {totals.onHand > 0
+                      ? `${Math.round((totals.netAvail / totals.onHand) * 100)}% FREE`
+                      : '0% FREE'}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.ledgerCell}>
-                <Text style={styles.eyebrow}>Reserved Stock</Text>
-                <Text style={styles.kpiValue}>
-                  {totals.reserved.toLocaleString()}
-                </Text>
-                <Text style={styles.monoSub}>EA · Production WO</Text>
-              </View>
+
+              {totals.onHand > 0 && (
+                <View style={styles.utilizationTrack}>
+                  <View
+                    style={[
+                      styles.utilizationAvail,
+                      { flex: Math.max(0.02, totals.netAvail) },
+                    ]}
+                  />
+                  {totals.reserved > 0 && (
+                    <View
+                      style={[
+                        styles.utilizationReserved,
+                        { flex: Math.max(0.02, totals.reserved) },
+                      ]}
+                    />
+                  )}
+                </View>
+              )}
             </View>
 
-            <View style={styles.ledgerRowBottom}>
-              <View style={[styles.ledgerBottomCell, styles.ledgerCellLeft]}>
-                <Text style={styles.eyebrow}>Net Avail</Text>
-                <Text style={styles.netAvailValue}>
-                  {totals.netAvail.toLocaleString()}
+            <View style={styles.ledgerStripRow}>
+              <View style={[styles.ledgerStripCell, styles.ledgerCellLeft]}>
+                <Text style={styles.eyebrow}>ON HAND</Text>
+                <Text style={styles.kpiSubValue}>
+                  {totals.onHand.toLocaleString()}
+                </Text>
+              </View>
+              <View style={[styles.ledgerStripCell, styles.ledgerCellLeft]}>
+                <Text style={styles.eyebrow}>RESERVED</Text>
+                <Text style={styles.kpiSubValue}>
+                  {totals.reserved.toLocaleString()}
                 </Text>
               </View>
               <Pressable
@@ -275,7 +349,7 @@ export const DashboardScreen: React.FC = () => {
                 }}
                 accessibilityRole="button"
                 style={({ pressed }) => [
-                  styles.ledgerBottomCell,
+                  styles.ledgerStripCell,
                   pressed && styles.pressedSurface,
                 ]}
               >
@@ -285,107 +359,149 @@ export const DashboardScreen: React.FC = () => {
                     { color: failedCount > 0 ? Colors.error : Colors.onSurfaceVariant },
                   ]}
                 >
-                  {failedCount} Failed
+                  QUEUE
                 </Text>
                 <Text
                   style={[
-                    styles.retryLink,
-                    { color: failedCount > 0 ? Colors.error : Colors.primary },
+                    styles.kpiSubValue,
+                    { color: failedCount > 0 ? Colors.error : Colors.onSurface },
                   ]}
                 >
-                  {failedCount > 0 ? 'Retry' : 'Ledger'}
+                  {failedCount > 0 ? `${failedCount} Failed` : pendingAndFailedCount}
                 </Text>
               </Pressable>
             </View>
           </View>
 
-          {/* Inbound Shipment Card */}
+          {/* Inbound Shipment */}
           {inbound && (
-            <View style={styles.card}>
-              <View style={styles.inboundHeader}>
-                <Text style={styles.eyebrow}>
-                  Inbound Shipment{inbound.isDemo ? ' · DEMO' : ''}
-                </Text>
-                <StatusBadge
-                  label={
-                    inbound.status === 'in_transit'
-                      ? 'In Transit'
-                      : inbound.status === 'delayed'
-                        ? 'Delayed'
-                        : 'On Time'
-                  }
-                  variant={inbound.status === 'on_time' ? 'success' : 'warning'}
-                />
-              </View>
-              <View style={styles.inboundBody}>
-                <View style={styles.inboundTextCol}>
-                  <Text style={styles.titleMd}>
-                    {inbound.skuName ?? inbound.skuId} · Expected {inbound.qty} EA
+            <View style={styles.inboundPanel}>
+              <View style={styles.inboundAccent} />
+              <View style={styles.inboundInner}>
+                <View style={styles.inboundHeader}>
+                  <Text style={styles.eyebrow}>
+                    INBOUND{inbound.isDemo ? ' · DEMO' : ''}
                   </Text>
-                  <Text style={styles.monoSub}>
-                    {inbound.skuId} · {inbound.poNumber} · ETA {inbound.etaTime}
-                  </Text>
+                  <StatusBadge
+                    label={
+                      inbound.status === 'in_transit'
+                        ? 'In Transit'
+                        : inbound.status === 'delayed'
+                          ? 'Delayed'
+                          : 'On Time'
+                    }
+                    variant={inbound.status === 'on_time' ? 'success' : 'warning'}
+                    dot
+                  />
                 </View>
-                <Pressable
-                  onPress={() => {
-                    selectSku(inbound.skuId);
-                    navigate('GoodsReceived');
-                  }}
-                  hitSlop={8}
-                >
-                  <Text style={styles.primaryLink}>Receive</Text>
-                </Pressable>
+                <View style={styles.inboundBody}>
+                  <View style={styles.inboundTextCol}>
+                    <Text style={styles.titleMd}>
+                      {inbound.skuName ?? inbound.skuId} · {inbound.qty} units
+                    </Text>
+                    <Text style={styles.monoSub}>
+                      {inbound.skuId} · {inbound.poNumber} · ETA {inbound.etaTime}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => {
+                      selectSku(inbound.skuId);
+                      navigate('GoodsReceived');
+                    }}
+                    style={({ pressed }) => [
+                      styles.compactActionBtn,
+                      pressed && styles.pressedSurface,
+                    ]}
+                  >
+                    <Text style={styles.compactActionText}>Receive</Text>
+                  </Pressable>
+                </View>
               </View>
             </View>
           )}
 
-          {/* Primary Operational Actions */}
+          {/* Actions */}
           <View style={styles.sectionBlock}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.eyebrow}>Record Warehouse Activity</Text>
+              <Text style={styles.eyebrow}>ACTIONS</Text>
               <Pressable
                 onPress={() => navigate('PlantSkuSelection')}
                 hitSlop={8}
               >
-                <Text style={styles.activeSkuLink}>{activeSku.id}</Text>
+                <Text style={styles.activeSkuLink}>
+                  {activeSku.name} ({activeSku.id})
+                </Text>
               </Pressable>
             </View>
 
             <Button
-              label="Record Goods Received"
+              label="Receive Goods"
               variant="with-icon"
               leftIcon="move-to-inbox"
               rightIcon="arrow-forward"
               onPress={() => navigate('GoodsReceived')}
             />
 
-            <View style={styles.secondaryActionRow}>
-              <Button
-                label="Dispatch Stock"
-                variant="secondary"
-                leftIcon="local-shipping"
+            <View style={styles.actionGrid}>
+              <Pressable
                 onPress={() => navigate('GoodsDispatch')}
-                style={styles.halfBtn}
-              />
-              <Button
-                label="Stock Count"
-                variant="secondary"
-                leftIcon="fact-check"
+                style={({ pressed }) => [
+                  styles.actionTile,
+                  pressed && styles.pressedSurface,
+                ]}
+              >
+                <MaterialIcons name="local-shipping" size={18} color={Colors.primary} />
+                <Text style={styles.actionTileTitle}>Dispatch</Text>
+                <Text style={styles.monoSub}>Outgoing stock</Text>
+              </Pressable>
+
+              <Pressable
                 onPress={() => navigate('PhysicalStockCorrection')}
-                style={styles.halfBtn}
-              />
+                style={({ pressed }) => [
+                  styles.actionTile,
+                  pressed && styles.pressedSurface,
+                ]}
+              >
+                <MaterialIcons name="fact-check" size={18} color={Colors.primary} />
+                <Text style={styles.actionTileTitle}>Stock Count</Text>
+                <Text style={styles.monoSub}>Physical count</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => navigate('WarehouseNetwork')}
+                style={({ pressed }) => [
+                  styles.actionTile,
+                  pressed && styles.pressedSurface,
+                ]}
+              >
+                <MaterialIcons name="hub" size={18} color={Colors.primary} />
+                <Text style={styles.actionTileTitle}>Network</Text>
+                <Text style={styles.monoSub}>Other warehouses</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => navigate('InventoryEventHistory')}
+                style={({ pressed }) => [
+                  styles.actionTile,
+                  pressed && styles.pressedSurface,
+                ]}
+              >
+                <MaterialIcons name="history" size={18} color={Colors.primary} />
+                <Text style={styles.actionTileTitle}>Movements</Text>
+                <Text style={styles.monoSub}>Event ledger</Text>
+              </Pressable>
             </View>
           </View>
 
           {/* Recent Activity Timeline */}
           <View style={styles.sectionBlock}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.eyebrow}>Activity Timeline · Today</Text>
+              <Text style={styles.eyebrow}>Recent Inventory Movements</Text>
               <Pressable
                 onPress={() => navigate('InventoryEventHistory')}
                 hitSlop={8}
               >
-                <Text style={styles.primaryLink}>Full Ledger</Text>
+                <Text style={styles.primaryLink}>Full History</Text>
               </Pressable>
             </View>
 
@@ -404,19 +520,20 @@ export const DashboardScreen: React.FC = () => {
                       : evt.status === 'pending'
                         ? 'warning'
                         : 'success';
-                  const badgeLabel =
-                    evt.status === 'failed'
-                      ? 'Failed'
+                  const badgeLabel = evt.isDemo
+                    ? 'Demo Data'
+                    : evt.status === 'failed'
+                      ? 'Sync Failed'
                       : evt.status === 'pending'
-                        ? 'Pending'
-                        : 'Submitted';
+                        ? 'Action Pending'
+                        : 'Synced';
                   const deltaPrefix = evt.qtyDelta > 0 ? '+' : '';
                   const opShort =
                     evt.operation === 'goods_received'
-                      ? 'Received'
+                      ? 'Goods Received'
                       : evt.operation === 'goods_dispatch'
-                        ? 'Dispatch'
-                        : 'Correction';
+                        ? 'Stock Dispatched'
+                        : 'Physical Stock Corrected';
 
                   return (
                     <Pressable
@@ -433,11 +550,11 @@ export const DashboardScreen: React.FC = () => {
                       <View style={styles.timelineContent}>
                         <View style={styles.timelineTextCol}>
                           <Text style={styles.titleMd} numberOfLines={1}>
-                            {opShort} · {evt.skuId}
+                            {opShort} · {evt.skuName}
                           </Text>
                           <Text style={styles.monoSub} numberOfLines={1}>
                             {evt.eventId} · {deltaPrefix}
-                            {evt.qtyDelta} EA · {evt.timestampIst}
+                            {evt.qtyDelta} units · {evt.timestampIst}
                           </Text>
                         </View>
                         <StatusBadge label={badgeLabel} variant={badgeVariant} />
@@ -479,6 +596,196 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 680,
     gap: Spacing.gutterLg,
+  },
+  commandCard: {
+    backgroundColor: Colors.inverseSurface,
+    borderWidth: 1,
+    borderColor: Colors.charcoalBorder,
+    borderTopWidth: 2,
+    borderTopColor: Colors.antiqueGold,
+    borderRadius: Radii.md,
+    padding: Spacing.gutterLg,
+    gap: Spacing.gutterMd,
+  },
+  commandEyebrow: {
+    fontFamily: FontFamily.monoSemiBold,
+    fontSize: 10,
+    lineHeight: 14,
+    letterSpacing: 1.1,
+    color: Colors.antiqueGold,
+  },
+  commandTitle: {
+    fontFamily: FontFamily.display,
+    fontSize: 28,
+    lineHeight: 32,
+    letterSpacing: -0.4,
+    color: Colors.inverseOnSurface,
+  },
+  commandSub: {
+    fontFamily: FontFamily.mono,
+    fontSize: 11,
+    lineHeight: 16,
+    color: Colors.surfaceDim,
+  },
+  commandSwitchBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: Radii.sm,
+    borderWidth: 1,
+    borderColor: Colors.antiqueGoldMuted,
+    backgroundColor: 'rgba(200, 162, 90, 0.12)',
+  },
+  commandSwitchText: {
+    fontFamily: FontFamily.label,
+    fontSize: 11,
+    color: Colors.antiqueGold,
+    letterSpacing: 0.4,
+  },
+  commandDivider: {
+    paddingTop: Spacing.gutterSm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.charcoalBorder,
+    gap: 4,
+  },
+  commandSyncLabel: {
+    fontFamily: FontFamily.label,
+    fontSize: 12,
+    lineHeight: 16,
+    color: Colors.inverseOnSurface,
+  },
+  commandLink: {
+    fontFamily: FontFamily.monoSemiBold,
+    fontSize: 11,
+    color: Colors.inversePrimary,
+    textDecorationLine: 'underline',
+  },
+  commandLinkGold: {
+    fontFamily: FontFamily.monoSemiBold,
+    fontSize: 11,
+    color: Colors.antiqueGold,
+    textDecorationLine: 'underline',
+  },
+  commandWarn: {
+    fontFamily: FontFamily.mono,
+    fontSize: 11,
+    color: '#F7D08A',
+  },
+  heroStockZone: {
+    padding: Spacing.gutterLg,
+    gap: Spacing.gutterMd,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.outlineVariant,
+  },
+  heroStockTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: Spacing.gutterSm,
+  },
+  heroKpiValue: {
+    fontFamily: FontFamily.display,
+    fontSize: 48,
+    lineHeight: 52,
+    letterSpacing: -1.4,
+    color: Colors.primary,
+    fontVariant: ['tabular-nums'],
+  },
+  heroAvailBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: Radii.sm,
+    backgroundColor: Colors.secondaryContainer,
+    borderWidth: 1,
+    borderColor: 'rgba(18, 61, 50, 0.16)',
+  },
+  heroAvailPct: {
+    fontFamily: FontFamily.monoSemiBold,
+    fontSize: 10,
+    letterSpacing: 0.6,
+    color: Colors.primary,
+  },
+  utilizationTrack: {
+    height: 6,
+    borderRadius: Radii.sm,
+    backgroundColor: Colors.surfaceContainer,
+    flexDirection: 'row',
+    overflow: 'hidden',
+    gap: 2,
+  },
+  utilizationAvail: {
+    backgroundColor: Colors.primary,
+    borderRadius: Radii.sm,
+  },
+  utilizationReserved: {
+    backgroundColor: Colors.antiqueGold,
+    borderRadius: Radii.sm,
+  },
+  ledgerStripRow: {
+    flexDirection: 'row',
+    backgroundColor: Colors.surfaceContainerLow,
+  },
+  ledgerStripCell: {
+    flex: 1,
+    paddingHorizontal: Spacing.gutterMd,
+    paddingVertical: Spacing.gutterMd,
+    gap: 2,
+  },
+  kpiSubValue: {
+    fontFamily: FontFamily.headline,
+    fontSize: 18,
+    lineHeight: 22,
+    color: Colors.onSurface,
+    fontVariant: ['tabular-nums'],
+  },
+  inboundPanel: {
+    backgroundColor: Colors.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: Colors.outlineVariant,
+    borderRadius: Radii.md,
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
+  inboundAccent: {
+    width: 3,
+    backgroundColor: Colors.warning,
+  },
+  inboundInner: {
+    flex: 1,
+    padding: Spacing.gutterLg,
+    gap: Spacing.gutterSm,
+  },
+  compactActionBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: Radii.sm,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    backgroundColor: Colors.secondaryContainer,
+  },
+  compactActionText: {
+    fontFamily: FontFamily.label,
+    fontSize: 12,
+    color: Colors.primary,
+  },
+  actionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.gutterSm,
+  },
+  actionTile: {
+    width: '48.8%',
+    backgroundColor: Colors.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: Colors.outlineVariant,
+    borderRadius: Radii.md,
+    padding: Spacing.gutterMd,
+    gap: 4,
+  },
+  actionTileTitle: {
+    fontFamily: FontFamily.title,
+    fontSize: 14,
+    color: Colors.onSurface,
+    marginTop: 2,
   },
   card: {
     backgroundColor: Colors.surfaceContainerLowest,

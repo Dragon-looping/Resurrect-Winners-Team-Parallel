@@ -10,6 +10,8 @@ export const Colors = {
   primaryContainer: '#1D5446',
   onPrimaryContainer: '#FFFFFF',
   antiqueGold: '#C8A25A',
+  antiqueGoldMuted: 'rgba(200, 162, 90, 0.32)',
+  charcoalBorder: '#313B36',
 
   // Secondary
   secondary: '#535B55',
@@ -76,6 +78,12 @@ export const FontFamily = {
 } as const;
 
 export const Typography = {
+  kpiHero: {
+    fontFamily: FontFamily.display,
+    fontSize: 40,
+    lineHeight: 44,
+    letterSpacing: -1.0,
+  },
   displayMd: {
     fontFamily: FontFamily.display,
     fontSize: 34,
@@ -168,9 +176,9 @@ export const Spacing = {
 
 export const Radii = {
   none: 0,
-  sm: 6,
-  default: 10,
-  md: 12,
-  lg: 14,
+  sm: 4,
+  default: 6,
+  md: 8,
+  lg: 10,
   full: 9999,
 } as const;

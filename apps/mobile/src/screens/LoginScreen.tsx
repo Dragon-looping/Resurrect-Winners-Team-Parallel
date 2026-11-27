@@ -83,9 +83,6 @@ export const LoginScreen: React.FC = () => {
               style={styles.mobileLogo}
               resizeMode="contain"
             />
-            <Text style={styles.mobileTagline}>
-              ENTERPRISE INVENTORY NETWORK
-            </Text>
           </View>
         )}
 
@@ -101,11 +98,10 @@ export const LoginScreen: React.FC = () => {
             <View style={styles.asideCenter}>
               <View style={styles.asideCopy}>
                 <Text style={styles.asideHeadline}>
-                  One network. Every commitment.
+                  Stock control.{'\n'}Every plant.
                 </Text>
                 <Text style={styles.asideBody}>
-                  Intelligent inventory, fulfilment and recovery — coordinated
-                  across every plant.
+                  Receiving, dispatch, physical counts, and inter-warehouse transfers.
                 </Text>
               </View>
 
@@ -130,9 +126,9 @@ export const LoginScreen: React.FC = () => {
         >
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>Welcome back</Text>
+              <Text style={styles.cardTitle}>Sign in</Text>
               <Text style={styles.cardSubtitle}>
-                Sign in to your operations workspace.
+                Warehouse operator access.
               </Text>
             </View>
 

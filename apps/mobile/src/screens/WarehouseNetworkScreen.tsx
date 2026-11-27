@@ -51,6 +51,95 @@ function statusBadgeVariant(status: string): BadgeVariant {
   }
 }
 
+function humanizeStatus(status: string): string {
+  switch (status) {
+    case 'IN_STOCK':
+      return 'In Stock';
+    case 'LOW_STOCK':
+      return 'Low Stock';
+    case 'OUT_OF_STOCK':
+      return 'Out of Stock';
+    case 'PENDING':
+      return 'Awaiting Approval';
+    case 'APPROVED':
+      return 'Approved';
+    case 'PARTIALLY_APPROVED':
+      return 'Partially Approved';
+    case 'REJECTED':
+      return 'Rejected';
+    case 'DISPATCHED':
+      return 'Dispatched';
+    case 'PARTIALLY_FULFILLED':
+      return 'Partially Fulfilled';
+    case 'FULFILLED':
+      return 'Fulfilled';
+    case 'CANCELLED':
+      return 'Cancelled';
+    default:
+      return status;
+  }
+}
+
+const TRANSFER_STEPS = [
+  '1. Discover',
+  '2. Request',
+  '3. Review',
+  '4. Dispatch',
+  '5. Receive',
+  '6. Fulfill',
+];
+
+const REQUEST_STAGE_INDEX: Record<string, number> = {
+  PENDING: 0,
+  APPROVED: 1,
+  PARTIALLY_APPROVED: 1,
+  DISPATCHED: 2,
+  PARTIALLY_FULFILLED: 3,
+  FULFILLED: 4,
+};
+
+const RequestStageStrip: React.FC<{ status: string }> = ({ status }) => {
+  if (status === 'REJECTED' || status === 'CANCELLED') {
+    return (
+      <View style={styles.stageTerminalRow}>
+        <Text style={styles.errorText}>
+          {status === 'REJECTED'
+            ? 'Request rejected — no stock was moved.'
+            : 'Request cancelled before approval.'}
+        </Text>
+      </View>
+    );
+  }
+  const activeIdx = REQUEST_STAGE_INDEX[status] ?? 0;
+  const labels = ['Requested', 'Approved', 'Dispatched', 'Received', 'Fulfilled'];
+  return (
+    <View style={styles.stageRow}>
+      {labels.map((label, idx) => {
+        const done = idx <= activeIdx;
+        return (
+          <View key={label} style={styles.stageItem}>
+            <View
+              style={[
+                styles.stageBar,
+                done ? styles.stageBarDone : styles.stageBarPending,
+              ]}
+            />
+            <Text
+              style={[
+                styles.stageLabel,
+                done ? styles.stageLabelDone : styles.stageLabelPending,
+              ]}
+              numberOfLines={1}
+            >
+              {label}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+};
+
 export const WarehouseNetworkScreen: React.FC = () => {
   const { user, activePlant, isOffline, refreshLiveData } = useApp();
   const [tab, setTab] = useState<NetworkTab>('availability');
@@ -208,21 +297,25 @@ export const WarehouseNetworkScreen: React.FC = () => {
       <MainTopBar />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <View style={styles.responsiveColumn}>
-          <View style={styles.headerCard}>
+          <View style={styles.commandHeaderCard}>
             <View style={styles.headerText}>
-              <Text style={styles.eyebrow}>READ-ONLY NETWORK & REQUESTS</Text>
-              <Text style={styles.headlineMd}>Warehouse Network</Text>
-              <Text style={styles.monoSub}>
-                Signed in as {activePlant.name} (Plant #{activePlant.backendId})
+              <Text style={styles.commandEyebrow}>NETWORK</Text>
+              <Text style={styles.commandTitle}>
+                {activePlant.name}
+              </Text>
+              <Text style={styles.commandSub}>
+                Other warehouses · Read-only availability
               </Text>
             </View>
             <Pressable
               onPress={loadNetworkData}
               disabled={loading || !user?.token}
-              style={styles.refreshBtn}
+              style={styles.commandRefreshBtn}
             >
-              <MaterialIcons name="refresh" size={18} color={Colors.primary} />
-              <Text style={styles.refreshText}>{loading ? 'Loading' : 'Sync'}</Text>
+              <MaterialIcons name="refresh" size={16} color={Colors.antiqueGold} />
+              <Text style={styles.commandRefreshText}>
+                {loading ? 'Syncing' : 'Sync'}
+              </Text>
             </Pressable>
           </View>
 
@@ -302,7 +395,7 @@ export const WarehouseNetworkScreen: React.FC = () => {
                 <View style={styles.card}>
                   <Text style={styles.monoSub}>
                     {user?.token
-                      ? 'No other warehouse stock records returned.'
+                      ? 'No stock records at other warehouses.'
                       : 'Sign in with a warehouse account to view other warehouses.'}
                   </Text>
                 </View>
@@ -311,20 +404,23 @@ export const WarehouseNetworkScreen: React.FC = () => {
                   <View key={`${item.plant_id}-${item.sku_id}`} style={styles.card}>
                     <View style={styles.rowBetween}>
                       <View style={{ flex: 1, gap: 2 }}>
-                        <Text style={styles.titleMd}>
-                          {item.plant_name} · {item.sku_name}
-                        </Text>
+                        <Text style={styles.eyebrow}>{item.plant_name}</Text>
+                        <Text style={styles.titleMd}>{item.sku_name}</Text>
                         <Text style={styles.monoSub}>
-                          {item.sku_code} · Avail: {item.available_stock} {item.unit}
-                        </Text>
-                        <Text style={styles.monoSub}>
-                          Updated: {item.updated_at ? item.updated_at.slice(0, 16).replace('T', ' ') : 'N/A'}
+                          {item.sku_code} · Updated{' '}
+                          {item.updated_at ? item.updated_at.slice(0, 16).replace('T', ' ') : 'Not yet recorded'}
                         </Text>
                       </View>
-                      <StatusBadge
-                        label={item.availability_status}
-                        variant={statusBadgeVariant(item.availability_status)}
-                      />
+                      <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                        <Text style={styles.availQtyValue}>
+                          {item.available_stock.toLocaleString()}
+                        </Text>
+                        <StatusBadge
+                          label={humanizeStatus(item.availability_status)}
+                          variant={statusBadgeVariant(item.availability_status)}
+                          dot
+                        />
+                      </View>
                     </View>
                     <Pressable
                       onPress={() => {
@@ -345,7 +441,9 @@ export const WarehouseNetworkScreen: React.FC = () => {
             <View style={styles.section}>
               {incomingRequests.length === 0 ? (
                 <View style={styles.card}>
-                  <Text style={styles.monoSub}>No incoming requests addressed to {activePlant.name}.</Text>
+                  <Text style={styles.monoSub}>
+                    No incoming requests.
+                  </Text>
                 </View>
               ) : (
                 incomingRequests.map((req) => (
@@ -354,12 +452,13 @@ export const WarehouseNetworkScreen: React.FC = () => {
                       <Text style={styles.titleMd}>
                         {req.request_code} · From {req.requesting_plant_name}
                       </Text>
-                      <StatusBadge label={req.status} variant={statusBadgeVariant(req.status)} />
+                      <StatusBadge label={humanizeStatus(req.status)} variant={statusBadgeVariant(req.status)} />
                     </View>
                     <Text style={styles.monoSub}>
                       {req.sku_name} ({req.sku_code}) · Requested: {req.requested_qty} {req.unit}
                       {req.approved_qty !== null ? ` · Approved: ${req.approved_qty}` : ''}
                     </Text>
+                    <RequestStageStrip status={req.status} />
                     {req.reason && <Text style={styles.monoSub}>Note: {req.reason}</Text>}
                     {req.rejection_reason && (
                       <Text style={styles.errorText}>Rejected: {req.rejection_reason}</Text>
@@ -425,7 +524,9 @@ export const WarehouseNetworkScreen: React.FC = () => {
             <View style={styles.section}>
               {outgoingRequests.length === 0 ? (
                 <View style={styles.card}>
-                  <Text style={styles.monoSub}>No outgoing requests created by {activePlant.name}.</Text>
+                  <Text style={styles.monoSub}>
+                    No outgoing requests.
+                  </Text>
                 </View>
               ) : (
                 outgoingRequests.map((req) => (
@@ -434,7 +535,7 @@ export const WarehouseNetworkScreen: React.FC = () => {
                       <Text style={styles.titleMd}>
                         {req.request_code} · To {req.supplying_plant_name}
                       </Text>
-                      <StatusBadge label={req.status} variant={statusBadgeVariant(req.status)} />
+                      <StatusBadge label={humanizeStatus(req.status)} variant={statusBadgeVariant(req.status)} />
                     </View>
                     <Text style={styles.monoSub}>
                       {req.sku_name} ({req.sku_code}) · Req: {req.requested_qty}
@@ -442,6 +543,7 @@ export const WarehouseNetworkScreen: React.FC = () => {
                       {req.dispatched_qty > 0 ? ` · Disp: ${req.dispatched_qty}` : ''}
                       {req.received_qty > 0 ? ` · Recv: ${req.received_qty}` : ''} {req.unit}
                     </Text>
+                    <RequestStageStrip status={req.status} />
                     {req.rejection_reason && (
                       <Text style={styles.errorText}>Rejection: {req.rejection_reason}</Text>
                     )}
@@ -470,6 +572,92 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: Spacing.pageMargin, paddingBottom: Spacing.gutterXl, alignItems: 'center' },
   responsiveColumn: { width: '100%', maxWidth: 680, gap: Spacing.gutterMd },
+  commandHeaderCard: {
+    backgroundColor: Colors.inverseSurface,
+    borderWidth: 1,
+    borderColor: Colors.charcoalBorder,
+    borderTopWidth: 2,
+    borderTopColor: Colors.antiqueGold,
+    borderRadius: Radii.md,
+    padding: Spacing.gutterLg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.gutterMd,
+  },
+  commandEyebrow: {
+    fontFamily: FontFamily.monoSemiBold,
+    fontSize: 10,
+    letterSpacing: 1.1,
+    color: Colors.antiqueGold,
+  },
+  commandTitle: {
+    fontFamily: FontFamily.display,
+    fontSize: 22,
+    color: Colors.inverseOnSurface,
+  },
+  commandSub: {
+    fontFamily: FontFamily.mono,
+    fontSize: 11,
+    lineHeight: 16,
+    color: Colors.surfaceDim,
+  },
+  commandRefreshBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: Radii.sm,
+    borderWidth: 1,
+    borderColor: Colors.antiqueGoldMuted,
+    backgroundColor: 'rgba(200, 162, 90, 0.12)',
+  },
+  commandRefreshText: {
+    fontFamily: FontFamily.monoSemiBold,
+    fontSize: 11,
+    color: Colors.antiqueGold,
+  },
+  availQtyValue: {
+    fontFamily: FontFamily.display,
+    fontSize: 22,
+    lineHeight: 24,
+    color: Colors.primary,
+    fontVariant: ['tabular-nums'],
+  },
+  stageRow: {
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  stageItem: {
+    flex: 1,
+    gap: 3,
+  },
+  stageBar: {
+    height: 3,
+    borderRadius: 2,
+  },
+  stageBarDone: {
+    backgroundColor: Colors.primary,
+  },
+  stageBarPending: {
+    backgroundColor: Colors.surfaceContainerHigh,
+  },
+  stageLabel: {
+    fontFamily: FontFamily.mono,
+    fontSize: 9,
+  },
+  stageLabelDone: {
+    color: Colors.primary,
+  },
+  stageLabelPending: {
+    color: Colors.outline,
+  },
+  stageTerminalRow: {
+    marginTop: 2,
+  },
   headerCard: {
     backgroundColor: Colors.surfaceContainerLowest,
     borderWidth: 1,
@@ -555,6 +743,32 @@ const styles = StyleSheet.create({
     borderRadius: Radii.md,
     padding: Spacing.gutterMd,
     gap: 6,
+  },
+  workflowCard: {
+    backgroundColor: Colors.surfaceContainerLow,
+    borderWidth: 1,
+    borderColor: Colors.outlineVariant,
+    borderRadius: Radii.md,
+    padding: Spacing.gutterMd,
+    gap: 8,
+  },
+  stepsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  stepPill: {
+    backgroundColor: Colors.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: Colors.outlineVariant,
+    borderRadius: Radii.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  stepText: {
+    fontFamily: FontFamily.mono,
+    fontSize: 11,
+    color: Colors.onSurface,
   },
   formCard: {
     backgroundColor: Colors.surfaceContainerLowest,

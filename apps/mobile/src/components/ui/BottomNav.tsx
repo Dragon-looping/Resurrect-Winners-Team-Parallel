@@ -13,12 +13,12 @@ interface NavTab {
 }
 
 const TABS: NavTab[] = [
-  { screen: 'Dashboard', label: 'Dashboard', icon: 'dashboard' },
-  { screen: 'PlantSkuSelection', label: 'Plant & SKU', icon: 'inventory-2' },
+  { screen: 'Dashboard', label: 'Home', icon: 'dashboard' },
+  { screen: 'PlantSkuSelection', label: 'Catalog', icon: 'inventory-2' },
   { screen: 'WarehouseNetwork', label: 'Network', icon: 'hub' },
   {
     screen: 'InventoryEventHistory',
-    label: 'History',
+    label: 'Movements',
     icon: 'history',
     showCount: true,
   },

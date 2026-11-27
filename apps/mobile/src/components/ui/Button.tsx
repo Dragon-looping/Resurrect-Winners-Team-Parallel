@@ -67,7 +67,8 @@ export const Button: React.FC<ButtonProps> = ({
         {
           backgroundColor: bgColor,
           borderColor,
-          opacity: disabled ? 0.65 : pressed ? 0.88 : 1,
+          opacity: disabled ? 0.55 : pressed ? 0.9 : 1,
+          transform: [{ scale: pressed && !disabled ? 0.988 : 1 }],
         },
         style,
       ]}

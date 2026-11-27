@@ -1,14 +1,19 @@
 """SQLAlchemy ORM models package."""
 
 from app.models.enums import (
+    EmailDeliveryStatus,
     FeedStatus,
     InventoryEventType,
     OfferStatus,
     OrderStatus,
     PlanStatus,
+    ProcurementRole,
     ProductionBatchStatus,
+    ProposalStatus,
+    PurchaseOrderStatus,
     RecoveryStatus,
     RecoveryType,
+    UrgencyLevel,
 )
 from app.models.feed_health import FeedHealth
 from app.models.inventory_balance import InventoryBalance
@@ -22,6 +27,14 @@ from app.models.order import (
     ProductionBatch,
 )
 from app.models.plant import Plant
+from app.models.procurement import (
+    ProcurementAuditLog,
+    PurchaseOrder,
+    PurchaseProposal,
+    Supplier,
+    SupplierCatalogItem,
+    SupplierEmailLog,
+)
 from app.models.quarantined_event import QuarantinedEvent
 from app.models.recovery import RecoveryAuditLog, RecoveryPlan, RecoveryRoute
 from app.models.sku import SKU
@@ -29,6 +42,7 @@ from app.models.sku import SKU
 __all__ = [
     "CustomerOffer",
     "CustomerOrder",
+    "EmailDeliveryStatus",
     "FeedHealth",
     "FeedStatus",
     "InventoryBalance",
@@ -41,8 +55,14 @@ __all__ = [
     "OrderStatusHistory",
     "PlanStatus",
     "Plant",
+    "ProcurementAuditLog",
+    "ProcurementRole",
     "ProductionBatch",
     "ProductionBatchStatus",
+    "ProposalStatus",
+    "PurchaseOrder",
+    "PurchaseOrderStatus",
+    "PurchaseProposal",
     "QuarantinedEvent",
     "RecoveryAuditLog",
     "RecoveryPlan",
@@ -50,4 +70,8 @@ __all__ = [
     "RecoveryStatus",
     "RecoveryType",
     "SKU",
+    "Supplier",
+    "SupplierCatalogItem",
+    "SupplierEmailLog",
+    "UrgencyLevel",
 ]

@@ -106,10 +106,26 @@ export const Layout: React.FC<LayoutProps> = ({
             >
               Case Steering & Clarify
             </button>
+            <button
+              onClick={() => onNavigate && onNavigate('/procurement')}
+              style={{
+                textDecoration: 'none',
+                fontWeight: activeRoute.startsWith('/procurement') ? 600 : 400,
+                color: activeRoute.startsWith('/procurement') ? 'var(--oxide-red)' : 'var(--ink-secondary)',
+                borderBottom: activeRoute.startsWith('/procurement') ? '2px solid var(--oxide-red)' : '2px solid transparent',
+                paddingBottom: '2px'
+              }}
+            >
+              Procurement & Briefings
+            </button>
           </div>
           <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-faint)', fontSize: '0.75rem' }}>
-            {activeRoute.startsWith('/evaluation') || activeRoute.startsWith('/eval')
-              ? 'BRANCH 3: PS3 EVALUATION DEMO'
+            {activeRoute.startsWith('/procurement')
+              ? 'BRANCH 3: PROCUREMENT & BRIEFINGS'
+              : activeRoute.startsWith('/evaluation') || activeRoute.startsWith('/eval')
+              ? 'PS3 EVALUATION DEMO'
+              : activeRoute.startsWith('/cases/steering')
+              ? 'CASE STEERING & CLARIFICATION'
               : activeRoute.startsWith('/planner')
               ? 'BRANCH 2: PLANNER WORKSPACE'
               : 'BRANCH 1: CUSTOMER PORTAL'}

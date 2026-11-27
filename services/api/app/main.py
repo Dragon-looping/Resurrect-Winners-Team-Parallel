@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.cases.router import cases_router
 from app.clarification.router import clarification_router
 from app.core.config import get_settings
+from app.procurement.router import procurement_router
 from app.routes import (
     events_router,
     feeds_router,
@@ -64,6 +65,10 @@ def create_app() -> FastAPI:
     application.include_router(clarification_router)
     application.include_router(cases_router, prefix="/api", include_in_schema=False)
     application.include_router(clarification_router, prefix="/api", include_in_schema=False)
+
+    # Branch 3 Procurement & Briefings router (root + /api compatibility mirror)
+    application.include_router(procurement_router)
+    application.include_router(procurement_router, prefix="/api", include_in_schema=False)
 
     return application
 

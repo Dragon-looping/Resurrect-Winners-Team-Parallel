@@ -7,6 +7,7 @@ from app.schemas.event import (
     PaginatedQuarantinedEventsResponse,
     QuarantinedEventResponse,
 )
+from app.schemas.feed import FeedHeartbeatRequest, FeedStatusItem, FeedStatusListResponse
 from app.schemas.health import HealthResponse
 from app.schemas.replay import ReplayBalanceItem, ReplayResponse
 

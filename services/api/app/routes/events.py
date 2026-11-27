@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.inventory.feeds import record_feed_event_failure, record_feed_event_success
 from app.inventory.ingestion import EventValidationError, ingest_event
 from app.inventory.quarantine import list_quarantined_events, quarantine_event
 from app.schemas.event import (
@@ -106,6 +107,13 @@ async def create_inventory_event(
             error_details=details,
             received_at=received_at,
         )
+        if quarantined.source:
+            record_feed_event_failure(
+                db,
+                source=quarantined.source,
+                error_message=quarantined.failure_reason,
+                received_at=received_at,
+            )
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
@@ -125,6 +133,13 @@ async def create_inventory_event(
             failure_reason=exc.reason,
             received_at=received_at,
         )
+        if quarantined.source:
+            record_feed_event_failure(
+                db,
+                source=quarantined.source,
+                error_message=exc.reason,
+                received_at=received_at,
+            )
         raise HTTPException(
             status_code=exc.status_code,
             detail={
@@ -142,6 +157,12 @@ async def create_inventory_event(
             message="Duplicate event ignored idempotently.",
             event=InventoryEventResponse.model_validate(persisted_event),
         )
+
+    record_feed_event_success(
+        db,
+        source=persisted_event.source,
+        received_at=persisted_event.received_at,
+    )
 
     return EventIngestionResponse(
         status="accepted",

@@ -15,3 +15,7 @@ venv/
 .ruff_cache/
 dist/
 build/
+node_modules
+dist
+.DS_Store
+*.local

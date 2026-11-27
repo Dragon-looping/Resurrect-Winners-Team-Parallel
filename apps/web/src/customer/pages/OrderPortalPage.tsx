@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CustomerOrder } from '../types/order.ts';
+import { CustomerOrder, CustomerDecision } from '../types/order.ts';
 import { getOrderAdapter } from '../adapters/orderAdapter.ts';
 import { ClarificationCard } from '../components/ClarificationCard.tsx';
+import { SplitOfferCard } from '../components/SplitOfferCard.tsx';
 import { OrderStatusBadge, OrderSummarySideCard } from '../components/OrderStatusHeader.tsx';
 import { AlertIcon, ClockIcon, RefreshIcon } from '../../shared/icons.tsx';
 
@@ -56,6 +57,25 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
     }
   };
 
+  const handleOfferDecision = async (decision: CustomerDecision) => {
+    if (!order || !order.activeOffer) return;
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const adapter = getOrderAdapter();
+      const updated = await adapter.replyToOffer(order.orderId, {
+        offerId: order.activeOffer.offerId,
+        offerVersion: order.activeOffer.version,
+        decision
+      });
+      setOrder(updated);
+    } catch (err: any) {
+      setError(err.message || 'Failed to submit offer response.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleCopyLink = () => {
     const url = window.location.href;
     navigator.clipboard?.writeText(url).then(() => {
@@ -75,7 +95,7 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
     );
   }
 
-  if (error || !order) {
+  if (error && !order) {
     return (
       <div className="ruled-box" style={{ padding: '2rem', background: 'var(--surface)', borderLeft: '4px solid var(--oxide-red)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
@@ -85,7 +105,7 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
           </h2>
         </div>
         <p style={{ color: 'var(--ink-secondary)', marginBottom: '1.5rem' }}>
-          {error || `Order ${orderId} could not be located in current dispatch state.`}
+          {error}
         </p>
         <div style={{ display: 'flex', gap: '1rem' }}>
           <button className="btn-primary" onClick={() => fetchOrder()}>
@@ -98,6 +118,8 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
       </div>
     );
   }
+
+  if (!order) return null;
 
   // Determine state-based heading & subtext
   let pageHeading = 'Review delivery manifest';
@@ -173,6 +195,14 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
           </div>
         </div>
 
+        {/* Global Action Error Banner if reply fails */}
+        {error && (
+          <div style={{ padding: '0.75rem 1rem', background: 'var(--oxide-red-subtle)', border: '1px solid var(--oxide-red)', color: 'var(--oxide-red)', marginBottom: '1.25rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <AlertIcon size={16} color="var(--oxide-red)" />
+            <span>{error}</span>
+          </div>
+        )}
+
         {/* Dynamic State Headline */}
         <div style={{ marginBottom: '1.75rem' }}>
           <h1 style={{
@@ -199,10 +229,17 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
             onSubmit={handleClarificationSubmit}
             isSubmitting={isSubmitting}
           />
+        ) : order.status === 'offer_issued' && order.activeOffer && order.activeOffer.offerType === 'split' ? (
+          <SplitOfferCard
+            order={order}
+            offer={order.activeOffer}
+            onDecision={handleOfferDecision}
+            isSubmitting={isSubmitting}
+          />
         ) : (
           <div className="ruled-box" style={{ padding: '1.5rem', background: 'var(--surface)' }}>
             <p style={{ fontSize: '0.9rem', color: 'var(--ink-muted)' }}>
-              Order State: <strong>{order.status}</strong> · Active Offer: {order.activeOffer ? order.activeOffer.offerId : 'None'}
+              Active state: <strong>{order.status}</strong>
             </p>
           </div>
         )}

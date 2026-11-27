@@ -156,3 +156,68 @@ def allocate_orders(
     for order in updated_orders:
         db.refresh(order)
     return updated_orders
+
+
+def release_order_allocations(
+    db: Session,
+    order: CustomerOrder,
+    *,
+    reason: str = "Order allocation released",
+) -> CustomerOrder:
+    """Release all active inventory allocations for an order back to available stock."""
+    active_allocs = list(
+        db.execute(
+            select(OrderAllocation).where(
+                OrderAllocation.order_id == order.id,
+                OrderAllocation.status == "ACTIVE",
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if not active_allocs:
+        return order
+
+    total_release = sum(a.allocated_quantity for a in active_allocs)
+    now_utc = datetime.now(timezone.utc)
+    seq = _next_source_sequence(db, "order-lifecycle")
+    release_event = InventoryEvent(
+        source="order-lifecycle",
+        external_event_id=f"release-{order.id}-{uuid4().hex[:12]}",
+        plant_id=order.plant_id,
+        sku_id=order.sku_id,
+        event_type=InventoryEventType.STOCK_RELEASED.value,
+        quantity=total_release,
+        source_sequence=seq,
+        occurred_at=now_utc,
+        received_at=now_utc,
+        metadata_json={"order_id": order.id, "order_number": order.order_number},
+    )
+    db.add(release_event)
+    db.flush()
+
+    recompute_balance_for_pair(
+        db,
+        order.plant_id,
+        order.sku_id,
+        reference_now=now_utc,
+        validate_rules=True,
+    )
+
+    for alloc in active_allocs:
+        alloc.status = "RELEASED"
+        alloc.updated_at = now_utc
+
+    order.allocated_quantity = 0
+    if order.status not in {OrderStatus.CANCELLED.value, OrderStatus.DISPATCHED.value}:
+        transition_order_status(
+            db,
+            order,
+            OrderStatus.BACKLOGGED,
+            reason=reason,
+            commit=False,
+        )
+
+    db.commit()
+    db.refresh(order)
+    return order

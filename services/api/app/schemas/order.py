@@ -82,3 +82,19 @@ class OrderStatusTransitionRequest(BaseModel):
 
     to_status: OrderStatus
     reason: str | None = Field(default=None, max_length=500)
+
+
+class OrderAllocationResponse(BaseModel):
+    """Serialized order allocation record."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    order_id: int
+    plant_id: int
+    sku_id: int
+    allocated_quantity: int
+    reservation_event_id: int | None
+    status: str
+    created_at: datetime
+    updated_at: datetime

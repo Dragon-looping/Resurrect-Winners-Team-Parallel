@@ -4,18 +4,21 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.fulfilment.allocation import allocate_orders
+from app.fulfilment.allocation import allocate_orders, release_order_allocations
 from app.fulfilment.lifecycle import get_order_history, transition_order_status
 from app.fulfilment.orders import OrderError, create_order, get_order_by_id, list_orders
 from app.inventory.ingestion import EventValidationError
+from app.models import OrderAllocation
 from app.models.enums import OrderStatus
 from app.schemas.order import (
+    OrderAllocationResponse,
     OrderCreate,
     OrderResponse,
     OrderStatusHistoryResponse,
     OrderStatusTransitionRequest,
     PaginatedOrdersResponse,
 )
+from sqlalchemy import select
 
 router = APIRouter(tags=["Orders"])
 
@@ -142,3 +145,45 @@ def run_order_allocation(
     """Run deterministic priority-based inventory allocation."""
     updated = allocate_orders(db, plant_id=plant_id, sku_id=sku_id, order_id=order_id)
     return [OrderResponse.model_validate(o) for o in updated]
+
+
+@router.post(
+    "/orders/{order_id}/release",
+    response_model=OrderResponse,
+    summary="Release order allocations",
+    description="Releases active inventory reservations for an order back to available stock.",
+)
+def release_customer_order_allocations(
+    order_id: int,
+    db: Session = Depends(get_db),
+) -> OrderResponse:
+    """Release active allocations for an order."""
+    try:
+        order = get_order_by_id(db, order_id)
+        updated = release_order_allocations(db, order)
+    except OrderError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
+    return OrderResponse.model_validate(updated)
+
+
+@router.get(
+    "/orders/{order_id}/allocations",
+    response_model=list[OrderAllocationResponse],
+    summary="List order allocations",
+    description="Returns inventory allocation records for an order.",
+)
+def get_customer_order_allocations(
+    order_id: int,
+    db: Session = Depends(get_db),
+) -> list[OrderAllocationResponse]:
+    """List allocations for an order."""
+    try:
+        get_order_by_id(db, order_id)
+    except OrderError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.reason) from exc
+    allocs = db.execute(
+        select(OrderAllocation)
+        .where(OrderAllocation.order_id == order_id)
+        .order_by(OrderAllocation.id.asc())
+    ).scalars().all()
+    return [OrderAllocationResponse.model_validate(a) for a in allocs]

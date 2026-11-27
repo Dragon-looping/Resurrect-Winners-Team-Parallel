@@ -87,4 +87,5 @@ export interface AuthUser {
   name?: string;
   role?: string;
   token?: string;
+  isDevMode?: boolean;
 }

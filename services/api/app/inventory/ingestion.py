@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import InventoryEvent, Plant, SKU
@@ -31,8 +32,28 @@ def ensure_plant_and_sku_exist(db: Session, plant_id: int, sku_id: int) -> tuple
     return plant, sku
 
 
-def ingest_event(db: Session, payload: InventoryEventCreate) -> InventoryEvent:
-    """Validate references and persist an inventory event before acknowledging."""
+def find_existing_event(
+    db: Session,
+    source: str,
+    external_event_id: str,
+) -> InventoryEvent | None:
+    """Look up an already-persisted event by its idempotency key (source, external_event_id)."""
+    stmt = select(InventoryEvent).where(
+        InventoryEvent.source == source,
+        InventoryEvent.external_event_id == external_event_id,
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def ingest_event(db: Session, payload: InventoryEventCreate) -> tuple[InventoryEvent, bool]:
+    """Validate, deduplicate idempotently, and persist an inventory event.
+
+    Returns a tuple of (event, is_duplicate).
+    """
+    existing = find_existing_event(db, payload.source, payload.external_event_id)
+    if existing is not None:
+        return existing, True
+
     ensure_plant_and_sku_exist(db, payload.plant_id, payload.sku_id)
 
     event = InventoryEvent(
@@ -48,6 +69,14 @@ def ingest_event(db: Session, payload: InventoryEventCreate) -> InventoryEvent:
         metadata_json=dict(payload.metadata),
     )
     db.add(event)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        concurrent_existing = find_existing_event(db, payload.source, payload.external_event_id)
+        if concurrent_existing is not None:
+            return concurrent_existing, True
+        raise
+
     db.refresh(event)
-    return event
+    return event, False

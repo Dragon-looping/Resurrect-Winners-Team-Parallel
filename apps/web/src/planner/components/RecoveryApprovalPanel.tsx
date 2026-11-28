@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getPlannerAdapter } from '../adapters/plannerAdapter.ts';
+import { getPlannerAdapter, getPlannerConfig } from '../adapters/plannerAdapter.ts';
 import { CutoffPreviewResult, PlannerOrder } from '../types/planner.ts';
 import { CheckIcon, AlertIcon } from '../../shared/icons.tsx';
 
@@ -25,6 +25,8 @@ export const RecoveryApprovalPanel: React.FC<RecoveryApprovalPanelProps> = ({
   const selectedCandidate = order.candidates.find(
     c => c.candidateId === order.selectedCandidateId
   );
+
+  const isLive = getPlannerConfig().mode === 'live';
 
   const isResolved = order.riskStatus === 'resolved' || order.riskStatus === 'unavoidable_delay';
   const hasPreview = !!cutoffPreview;
@@ -241,6 +243,11 @@ export const RecoveryApprovalPanel: React.FC<RecoveryApprovalPanelProps> = ({
       {/* Reject section */}
       <div style={{ padding: '1rem', background: 'var(--surface-subtle)', border: '1px solid var(--rule)', marginBottom: '1.25rem' }}>
         <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.74rem', color: 'var(--ink-muted)', textTransform: 'uppercase', marginBottom: '0.6rem' }}>Reject Recovery</p>
+        {isLive && (
+          <div style={{ padding: '0.45rem 0.65rem', background: 'var(--surface)', border: '1px dashed var(--rule-dark)', color: 'var(--ink-muted)', fontSize: '0.78rem', marginBottom: '0.6rem' }}>
+            ℹ Unavailable on live backend: Person 2 dispatch operations handles recovery rejection.
+          </div>
+        )}
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: '180px' }}>
             <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--ink-secondary)', marginBottom: '0.3rem' }}>
@@ -276,6 +283,11 @@ export const RecoveryApprovalPanel: React.FC<RecoveryApprovalPanelProps> = ({
           <p style={{ fontSize: '0.82rem', color: '#92400e', marginBottom: '0.75rem' }}>
             All recovery candidates are infeasible. Record a delay note to close this order gracefully.
           </p>
+          {isLive && (
+            <div style={{ padding: '0.45rem 0.65rem', background: 'var(--surface)', border: '1px dashed #f59e0b', color: '#92400e', fontSize: '0.78rem', marginBottom: '0.6rem' }}>
+              ℹ Unavailable on live backend: Unavoidable delays are recorded via Person 2 dispatch exception logs.
+            </div>
+          )}
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: '220px' }}>
               <label style={{ display: 'block', fontSize: '0.8rem', color: '#92400e', marginBottom: '0.3rem' }}>

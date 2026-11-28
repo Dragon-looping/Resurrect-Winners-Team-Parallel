@@ -1,5 +1,6 @@
 import React from 'react';
 
+
 interface LayoutProps {
   children: React.ReactNode;
   orderRef?: string;
@@ -8,145 +9,27 @@ interface LayoutProps {
   onNavigate?: (route: string) => void;
 }
 
-export const Layout: React.FC<LayoutProps> = ({
-  children,
-  orderRef,
-  statusBadge,
-  activeRoute = '/customer/request',
-  onNavigate
-}) => {
-  return (
-    <div className="dispatch-shell">
-      <header className="dispatch-header">
-        <div className="dispatch-header-inner">
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem' }}>
-            <span 
-              className="brand-title" 
-              onClick={() => onNavigate && onNavigate('/customer/request')}
-              style={{ cursor: onNavigate ? 'pointer' : 'default' }}
-            >
-              SETUVYUHA
-            </span>
-            <span className="brand-tag">DISPATCH & FULFILMENT</span>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            {orderRef && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>
-                <span style={{ color: 'var(--ink-muted)' }}>ORDER:</span>
-                <span className="tabular" style={{ fontWeight: 600, color: 'var(--ink)' }}>{orderRef}</span>
-              </div>
-            )}
-            {statusBadge}
-          </div>
-        </div>
-      </header>
-
-      {/* Sub-nav for demonstration / switching */}
-      <nav style={{ borderBottom: '1px solid var(--rule)', background: 'var(--canvas)', padding: '0.4rem 1.5rem', fontSize: '0.8rem' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <button
-              onClick={() => onNavigate && onNavigate('/customer/request')}
-              style={{
-                textDecoration: 'none',
-                fontWeight: activeRoute.startsWith('/customer/request') ? 600 : 400,
-                color: activeRoute.startsWith('/customer/request') ? 'var(--oxide-red)' : 'var(--ink-secondary)',
-                borderBottom: activeRoute.startsWith('/customer/request') ? '2px solid var(--oxide-red)' : '2px solid transparent',
-                paddingBottom: '2px'
-              }}
-            >
-              Request Intake
-            </button>
-            <button
-              onClick={() => onNavigate && onNavigate(orderRef ? `/customer/orders/${orderRef}` : '/customer/orders/ORD-2026-MANIPAL-50')}
-              style={{
-                textDecoration: 'none',
-                fontWeight: activeRoute.startsWith('/customer/orders') ? 600 : 400,
-                color: activeRoute.startsWith('/customer/orders') ? 'var(--oxide-red)' : 'var(--ink-secondary)',
-                borderBottom: activeRoute.startsWith('/customer/orders') ? '2px solid var(--oxide-red)' : '2px solid transparent',
-                paddingBottom: '2px'
-              }}
-            >
-              {orderRef && activeRoute.startsWith('/customer/orders') ? `Order Portal (${orderRef})` : 'Order Portal (Sample)'}
-            </button>
-            <button
-              onClick={() => onNavigate && onNavigate(orderRef ? `/planner/orders/${orderRef}` : '/planner')}
-              style={{
-                textDecoration: 'none',
-                fontWeight: activeRoute.startsWith('/planner') ? 600 : 400,
-                color: activeRoute.startsWith('/planner') ? 'var(--oxide-red)' : 'var(--ink-secondary)',
-                borderBottom: activeRoute.startsWith('/planner') ? '2px solid var(--oxide-red)' : '2px solid transparent',
-                paddingBottom: '2px'
-              }}
-            >
-              Planner Workspace
-            </button>
-            <button
-              onClick={() => onNavigate && onNavigate('/evaluation')}
-              style={{
-                textDecoration: 'none',
-                fontWeight: activeRoute.startsWith('/evaluation') || activeRoute.startsWith('/eval') ? 600 : 400,
-                color: activeRoute.startsWith('/evaluation') || activeRoute.startsWith('/eval') ? 'var(--oxide-red)' : 'var(--ink-secondary)',
-                borderBottom: activeRoute.startsWith('/evaluation') || activeRoute.startsWith('/eval') ? '2px solid var(--oxide-red)' : '2px solid transparent',
-                paddingBottom: '2px'
-              }}
-            >
-              PS3 Evaluation
-            </button>
-            <button
-              onClick={() => onNavigate && onNavigate('/cases/steering')}
-              style={{
-                textDecoration: 'none',
-                fontWeight: activeRoute.startsWith('/cases/steering') ? 600 : 400,
-                color: activeRoute.startsWith('/cases/steering') ? 'var(--oxide-red)' : 'var(--ink-secondary)',
-                borderBottom: activeRoute.startsWith('/cases/steering') ? '2px solid var(--oxide-red)' : '2px solid transparent',
-                paddingBottom: '2px'
-              }}
-            >
-              Case Steering & Clarify
-            </button>
-            <button
-              onClick={() => onNavigate && onNavigate('/procurement')}
-              style={{
-                textDecoration: 'none',
-                fontWeight: activeRoute.startsWith('/procurement') ? 600 : 400,
-                color: activeRoute.startsWith('/procurement') ? 'var(--oxide-red)' : 'var(--ink-secondary)',
-                borderBottom: activeRoute.startsWith('/procurement') ? '2px solid var(--oxide-red)' : '2px solid transparent',
-                paddingBottom: '2px'
-              }}
-            >
-              Procurement & Briefings
-            </button>
-          </div>
-          <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-faint)', fontSize: '0.75rem' }}>
-            {activeRoute.startsWith('/procurement')
-              ? 'BRANCH 3: PROCUREMENT & BRIEFINGS'
-              : activeRoute.startsWith('/evaluation') || activeRoute.startsWith('/eval')
-              ? 'PS3 EVALUATION DEMO'
-              : activeRoute.startsWith('/cases/steering')
-              ? 'CASE STEERING & CLARIFICATION'
-              : activeRoute.startsWith('/planner')
-              ? 'BRANCH 2: PLANNER WORKSPACE'
-              : 'BRANCH 1: CUSTOMER PORTAL'}
-          </div>
-        </div>
-      </nav>
-
-      <main className="dispatch-main">
-        {children}
-      </main>
-
-      <footer className="dispatch-footer">
-        <div className="dispatch-footer-inner">
-          <div>
-            <span>SETUVYUHA Dispatch Engine · Regional Fulfilment Network</span>
-          </div>
-          <div style={{ fontFamily: 'var(--font-mono)' }}>
-            <span>AUTHORITATIVE LOGISTICS MANIFEST · 2026-11-27</span>
-          </div>
-        </div>
-      </footer>
-    </div>
-  );
+export const Layout: React.FC<LayoutProps> = ({children, orderRef, statusBadge, activeRoute = '/customer/request', onNavigate}) => {
+  const destinations = [
+    ['Request intake', '/customer/request', '/customer/request'],
+    ['Order portal', '/customer/orders/' + (orderRef || 'ORD-2026-MANIPAL-50'), '/customer/orders'],
+    ['Planner', orderRef ? '/planner/orders/' + orderRef : '/planner', '/planner'],
+    ['Evaluation', '/evaluation', '/eval'],
+    ['Case steering', '/cases/steering', '/cases'],
+    ['Procurement', '/procurement', '/procurement'],
+  ];
+  return <div className="dispatch-shell">
+    <header className="network-header">
+      <button className="network-brand" onClick={() => onNavigate?.('/customer/request')}>
+        <svg aria-hidden="true" viewBox="0 0 34 32" width="34" height="32" fill="none" stroke="currentColor" strokeWidth="3"><path d="M2 25 13 6h8l-11 19zm12 0L25 6h7L21 25z"/></svg>
+        SETUVYUHA
+      </button>
+      <nav aria-label="Workspaces">{destinations.map(([name, path, prefix]) =>
+        <a key={name} href={path} aria-current={activeRoute.startsWith(prefix) ? 'page' : undefined}
+          onClick={e => {if (onNavigate && !e.ctrlKey && !e.metaKey && !e.shiftKey) { e.preventDefault(); onNavigate(path); }}}>{name}</a>)}</nav>
+      <span className="network-context">{orderRef || 'Regional fulfilment'} {statusBadge}</span>
+    </header>
+    <main className="dispatch-main">{children}</main>
+    <footer className="dispatch-footer">SETUVYUHA · Regional fulfilment network</footer>
+  </div>;
 };

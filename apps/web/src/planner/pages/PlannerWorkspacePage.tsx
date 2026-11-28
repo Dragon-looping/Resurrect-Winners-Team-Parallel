@@ -75,7 +75,11 @@ export const PlannerWorkspacePage: React.FC<PlannerWorkspacePageProps> = ({
   const toggleMode = (mode: 'fixture' | 'live') => {
     setPlannerConfig({ mode });
     setConfig(getPlannerConfig());
-    loadWorkspace();
+    if (mode === 'live' && orderId === 'ORD-2026-MANIPAL-50') {
+      onNavigate('/planner/orders/10');
+    } else {
+      loadWorkspace();
+    }
   };
 
   const handleReset = () => {
@@ -126,7 +130,15 @@ export const PlannerWorkspacePage: React.FC<PlannerWorkspacePageProps> = ({
   };
 
   return (
-    <div>
+    <div className="planner-workspace">
+      {activeOrder && <GodownRouteMap order={activeOrder} orders={orders} onSelectOrder={id => onNavigate(`/planner/orders/${id}`)} onSelectCandidate={handleSelectCandidate}>
+          <CutoffChallengePanel
+            order={activeOrder}
+            preview={cutoffPreview}
+            onPreviewCutoff={handlePreviewCutoff}
+            isPreviewing={isPreviewing}
+          />
+      </GodownRouteMap>}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid var(--rule)', paddingBottom: '1.25rem', marginBottom: '1.5rem' }}>
         <div>
           <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -190,6 +202,7 @@ export const PlannerWorkspacePage: React.FC<PlannerWorkspacePageProps> = ({
         activeOrderId={orderId}
         onSelectOrder={id => onNavigate(`/planner/orders/${id}`)}
         onCreateOrder={handleCreateOrder}
+        error={error}
       />
 
       {activeOrder && (
@@ -200,13 +213,6 @@ export const PlannerWorkspacePage: React.FC<PlannerWorkspacePageProps> = ({
             streamError={streamError}
           />
           <PlannerOffersPanel order={activeOrder} />
-          <GodownRouteMap order={activeOrder} onSelectCandidate={handleSelectCandidate} />
-          <CutoffChallengePanel
-            order={activeOrder}
-            preview={cutoffPreview}
-            onPreviewCutoff={handlePreviewCutoff}
-            isPreviewing={isPreviewing}
-          />
           <OptionComparisonTable
             order={activeOrder}
             onSelectCandidate={handleSelectCandidate}

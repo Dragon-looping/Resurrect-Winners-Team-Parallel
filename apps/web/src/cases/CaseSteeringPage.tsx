@@ -6,7 +6,6 @@ import {
   searchCasesWithSteering,
   STEERING_PRESETS
 } from './caseSteeringAdapter.ts';
-import { AlertIcon, CheckIcon, HelpCircleIcon } from '../shared/icons.tsx';
 
 const RESOLUTION_LABELS: Record<string, string> = {
   split_delivery: 'Split Delivery',
@@ -24,7 +23,7 @@ export const CaseSteeringPage: React.FC = () => {
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  const [clarifyInput, setClarifyInput] = useState('Send 50 fans to Manipal by Friday');
+  const [clarifyInput, setClarifyInput] = useState('Send 50 fans to Manipal');
   const [clarifyResult, setClarifyResult] = useState<ClarificationResponse | null>(null);
   const [clarifyError, setClarifyError] = useState<string | null>(null);
 
@@ -71,362 +70,47 @@ export const CaseSteeringPage: React.FC = () => {
     };
   }, [clarifyInput]);
 
-  const toSvgCoord = (val: number, invert = false): number => {
-    const clamped = Math.max(-1.1, Math.min(1.1, val));
-    const norm = (clamped + 1.1) / 2.2;
-    return invert ? 240 - norm * 200 : 20 + norm * 280;
-  };
-
-  const baseQueryPt = searchResult?.projection_points.find((p) => p.case_id === 'QUERY_BASE');
-  const steeredQueryPt = searchResult?.projection_points.find((p) => p.case_id === 'QUERY_STEERED');
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
-      {/* Header Banner */}
-      <div className="ruled-box" style={{ padding: '1.5rem', background: 'var(--surface)' }}>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>
-          P4 · Case Steering, 2D Projection & Clarification Console
-        </div>
-        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 700, textTransform: 'uppercase', lineHeight: 1.15 }}>
-          Historical Case Retrieval & Vector Steering
-        </h1>
-        <p style={{ color: 'var(--ink-secondary)', marginTop: '0.4rem', maxWidth: '75ch' }}>
-          Adjust the steering slider to shift retrieval priority across historical regional fulfilment outcomes while keeping base case records immutable and 2D projection coordinates fixed.
-        </p>
-      </div>
-
-      {/* Controls + 2D Scatter Plot */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
-        <div className="ruled-box" style={{ padding: '1.25rem', background: 'var(--surface)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div>
-            <label htmlFor="case-search-query" style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.35rem' }}>
-              Search Query
-            </label>
-            <input
-              id="case-search-query"
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1px solid var(--rule-dark)', background: 'var(--canvas)', fontFamily: 'var(--font-body)' }}
-            />
-            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-              {[
-                '50 industrial fans Manipal urgent Friday Udupi shortage',
-                '20 submersible pumps Kundapura urgent irrigation',
-                '100 bulk fans Mangalore single load'
-              ].map((presetText) => (
-                <button
-                  key={presetText}
-                  type="button"
-                  onClick={() => setQuery(presetText)}
-                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', border: '1px solid var(--rule-dark)', background: 'var(--surface-subtle)', color: 'var(--ink-secondary)' }}
-                >
-                  {presetText.slice(0, 34)}...
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="steering-direction" style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.35rem' }}>
-              Steering Direction Axis
-            </label>
-            <select
-              id="steering-direction"
-              value={steeringDirection}
-              onChange={(e) => setSteeringDirection(e.target.value)}
-              style={{ width: '100%', padding: '0.55rem 0.75rem', border: '1px solid var(--rule-dark)', background: 'var(--canvas)' }}
-            >
-              {STEERING_PRESETS.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-              <label htmlFor="steering-slider" style={{ fontWeight: 600, fontSize: '0.85rem' }}>
-                Steering Strength Slider
-              </label>
-              <span className="tabular" style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: steeringStrength === 0 ? 'var(--ink-muted)' : 'var(--oxide-red)' }}>
-                {steeringStrength >= 0 ? `+${steeringStrength.toFixed(2)}` : steeringStrength.toFixed(2)}
-              </span>
-            </div>
-            <input
-              id="steering-slider"
-              type="range"
-              min={-1.5}
-              max={1.5}
-              step={0.1}
-              value={steeringStrength}
-              onChange={(e) => setSteeringStrength(parseFloat(e.target.value))}
-              style={{ width: '100%', accentColor: 'var(--oxide-red)' }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--ink-faint)', fontFamily: 'var(--font-mono)' }}>
-              <span>-1.50 (Steer Away)</span>
-              <span>0.00 (Neutral)</span>
-              <span>+1.50 (Steer Toward)</span>
-            </div>
-          </div>
-
-          {searchError && (
-            <div style={{ padding: '0.65rem', border: '1px solid var(--oxide-red)', background: 'var(--oxide-red-subtle)', color: 'var(--oxide-red)', fontSize: '0.85rem' }}>
-              {searchError}
-            </div>
-          )}
-        </div>
-
-        {/* Fixed 2D Projection Scatter Plot */}
-        <div className="ruled-box" style={{ padding: '1.25rem', background: 'var(--surface)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.5rem' }}>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', textTransform: 'uppercase' }}>
-              Fixed 2D Embedding Projection
-            </h2>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--ink-muted)' }}>
-              D={searchResult?.embedding_dimension ?? 64} · STABLE BASIS
-            </span>
-          </div>
-
-          <svg viewBox="0 0 320 260" style={{ width: '100%', height: 'auto', border: '1px solid var(--rule)', background: 'var(--canvas)' }} role="img" aria-label="2D Case Embedding Projection">
-            {/* Axes */}
-            <line x1="20" y1="140" x2="300" y2="140" stroke="#D6D3D1" strokeDasharray="3 3" />
-            <line x1="160" y1="30" x2="160" y2="240" stroke="#D6D3D1" strokeDasharray="3 3" />
-            <text x="24" y="22" fontSize="9" fill="#57534E" fontFamily="monospace">SPLIT / RECOVERY (-X)  |  SINGLE / LATER (+X)</text>
-
-            {/* Steering Vector Arrow */}
-            {baseQueryPt && steeredQueryPt && (
-              <line
-                x1={toSvgCoord(baseQueryPt.x)}
-                y1={toSvgCoord(baseQueryPt.y, true)}
-                x2={toSvgCoord(steeredQueryPt.x)}
-                y2={toSvgCoord(steeredQueryPt.y, true)}
-                stroke="#991B1B"
-                strokeWidth="2"
-                strokeDasharray="4 2"
-              />
-            )}
-
-            {/* Corpus Case Points */}
-            {searchResult?.projection_points
-              .filter((p) => !p.is_query)
-              .map((pt) => {
-                const cx = toSvgCoord(pt.x);
-                const cy = toSvgCoord(pt.y, true);
-                const isSelected = selectedCaseId === pt.case_id;
-                return (
-                  <g key={pt.case_id} style={{ cursor: 'pointer' }} onClick={() => setSelectedCaseId(pt.case_id)}>
-                    <circle
-                      cx={cx}
-                      cy={cy}
-                      r={isSelected ? 6.5 : 4.5}
-                      fill={isSelected ? '#991B1B' : '#18181B'}
-                      stroke="#FAF8F5"
-                      strokeWidth="1.5"
-                    />
-                    <title>{`${pt.case_id}: (${pt.x.toFixed(2)}, ${pt.y.toFixed(2)})`}</title>
-                  </g>
-                );
-              })}
-
-            {/* Query Base Point */}
-            {baseQueryPt && (
-              <g>
-                <rect
-                  x={toSvgCoord(baseQueryPt.x) - 5}
-                  y={toSvgCoord(baseQueryPt.y, true) - 5}
-                  width="10"
-                  height="10"
-                  fill="#FAF8F5"
-                  stroke="#18181B"
-                  strokeWidth="2"
-                />
-                <text x={toSvgCoord(baseQueryPt.x) + 8} y={toSvgCoord(baseQueryPt.y, true) + 3} fontSize="9" fontWeight="700" fill="#18181B">
-                  Q
-                </text>
-              </g>
-            )}
-
-            {/* Steered Query Point */}
-            {steeredQueryPt && (
-              <g>
-                <polygon
-                  points={`${toSvgCoord(steeredQueryPt.x)},${toSvgCoord(steeredQueryPt.y, true) - 7} ${toSvgCoord(steeredQueryPt.x) + 6},${toSvgCoord(steeredQueryPt.y, true) + 5} ${toSvgCoord(steeredQueryPt.x) - 6},${toSvgCoord(steeredQueryPt.y, true) + 5}`}
-                  fill="#991B1B"
-                />
-                <text x={toSvgCoord(steeredQueryPt.x) + 8} y={toSvgCoord(steeredQueryPt.y, true) + 3} fontSize="9" fontWeight="700" fill="#991B1B">
-                  Q*
-                </text>
-              </g>
-            )}
-          </svg>
-          <div style={{ display: 'flex', gap: '1rem', fontSize: '0.75rem', color: 'var(--ink-muted)', marginTop: '0.5rem', fontFamily: 'var(--font-mono)' }}>
-            <span>● Historical Case</span>
-            <span>□ Q (Unsteered)</span>
-            <span style={{ color: 'var(--oxide-red)' }}>▲ Q* (Steered)</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Ranked Cases Ledger */}
-      <div className="ruled-box" style={{ padding: '1.25rem', background: 'var(--surface)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.75rem' }}>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', textTransform: 'uppercase' }}>
-            Ranked Historical Cases
-          </h2>
-          <span className="tabular" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--ink-muted)' }}>
-            {searchResult?.results.length ?? 0} SHOWN / {searchResult?.total_matches ?? 0} TOTAL
-          </span>
-        </div>
-
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid var(--ink)', textAlign: 'left', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', textTransform: 'uppercase' }}>
-                <th style={{ padding: '0.5rem' }}>Rank</th>
-                <th style={{ padding: '0.5rem' }}>Δ</th>
-                <th style={{ padding: '0.5rem' }}>Case</th>
-                <th style={{ padding: '0.5rem' }}>Route</th>
-                <th style={{ padding: '0.5rem' }}>Resolution</th>
-                <th style={{ padding: '0.5rem', textAlign: 'right' }}>Base</th>
-                <th style={{ padding: '0.5rem', textAlign: 'right' }}>Steered</th>
-              </tr>
-            </thead>
-            <tbody>
-              {searchResult?.results.map((hit) => {
-                const isSelected = selectedCaseId === hit.case.case_id;
-                return (
-                  <tr
-                    key={hit.case.case_id}
-                    onClick={() => setSelectedCaseId(hit.case.case_id)}
-                    style={{
-                      borderBottom: '1px solid var(--rule)',
-                      background: isSelected ? 'var(--oxide-red-subtle)' : 'transparent',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <td className="tabular" style={{ padding: '0.6rem 0.5rem', fontWeight: 700 }}>#{hit.rank}</td>
-                    <td className="tabular" style={{ padding: '0.6rem 0.5rem', fontFamily: 'var(--font-mono)', color: hit.rank_delta > 0 ? 'var(--forest-green)' : hit.rank_delta < 0 ? 'var(--oxide-red)' : 'var(--ink-faint)' }}>
-                      {hit.rank_delta > 0 ? `+${hit.rank_delta}` : hit.rank_delta === 0 ? '0' : `${hit.rank_delta}`}
-                    </td>
-                    <td style={{ padding: '0.6rem 0.5rem' }}>
-                      <div style={{ fontWeight: 600 }}>{hit.case.title}</div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--ink-muted)' }}>{hit.case.outcome_summary}</div>
-                    </td>
-                    <td style={{ padding: '0.6rem 0.5rem', fontSize: '0.8rem', color: 'var(--ink-secondary)' }}>
-                      {hit.case.origin_hub} → {hit.case.destination_hub}
-                    </td>
-                    <td style={{ padding: '0.6rem 0.5rem', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>
-                      {RESOLUTION_LABELS[hit.case.resolution_type] ?? hit.case.resolution_type}
-                    </td>
-                    <td className="tabular" style={{ padding: '0.6rem 0.5rem', textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--ink-muted)' }}>
-                      {hit.base_similarity_score.toFixed(3)}
-                    </td>
-                    <td className="tabular" style={{ padding: '0.6rem 0.5rem', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--oxide-red)' }}>
-                      {hit.similarity_score.toFixed(3)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Ambiguity & Clarification Console */}
-      <div className="ruled-box" style={{ padding: '1.25rem', background: 'var(--surface)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-          <HelpCircleIcon size={18} color="var(--amber-warning)" />
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', textTransform: 'uppercase' }}>
-            Ambiguity Detection & Minimal Clarification (POST /clarify)
-          </h2>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
-          {[
-            'Send 50 fans to Manipal by Friday',
-            'Send 50 FAN-HV-24-IND industrial fans to Manipal by 2026-11-27 arrival at dock, split delivery ok',
-            'Need 50 fans to Manipal all together in single load, split delivery ok',
-            'Send some items soon'
-          ].map((sample) => (
-            <button
-              key={sample}
-              type="button"
-              onClick={() => setClarifyInput(sample)}
-              style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem', border: '1px solid var(--rule-dark)', background: 'var(--surface-subtle)' }}
-            >
-              {sample.slice(0, 44)}{sample.length > 44 ? '...' : ''}
-            </button>
-          ))}
-        </div>
-
-        <input
-          type="text"
-          value={clarifyInput}
-          onChange={(e) => setClarifyInput(e.target.value)}
-          aria-label="Clarification request text"
-          style={{ width: '100%', padding: '0.65rem 0.75rem', border: '1px solid var(--rule-dark)', background: 'var(--canvas)', marginBottom: '1rem' }}
-        />
-
-        {clarifyError && (
-          <div style={{ padding: '0.65rem', border: '1px solid var(--oxide-red)', background: 'var(--oxide-red-subtle)', color: 'var(--oxide-red)' }}>
-            {clarifyError}
-          </div>
-        )}
-
-        {clarifyResult && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-            <div
-              style={{
-                padding: '0.75rem 1rem',
-                border: `1px solid ${clarifyResult.can_proceed ? 'var(--forest-green)' : 'var(--amber-warning)'}`,
-                background: clarifyResult.can_proceed ? 'var(--forest-green-subtle)' : 'var(--amber-subtle)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '1rem',
-                flexWrap: 'wrap'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                {clarifyResult.can_proceed ? (
-                  <CheckIcon size={18} color="var(--forest-green)" />
-                ) : (
-                  <AlertIcon size={18} color="var(--amber-warning)" />
-                )}
-                <strong>{clarifyResult.brief_explanation}</strong>
-              </div>
-              <span className="tabular" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>
-                CAN PROCEED: {clarifyResult.can_proceed ? 'YES' : 'NO'} · CONFIDENCE: {(clarifyResult.confidence * 100).toFixed(0)}%
-              </span>
-            </div>
-
-            {clarifyResult.questions.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--ink-muted)', textTransform: 'uppercase' }}>
-                  Minimal Targeted Questions ({clarifyResult.questions.length})
-                </div>
-                {clarifyResult.questions.map((q) => (
-                  <div key={q.question_id} style={{ padding: '0.75rem', border: '1px solid var(--rule)', background: 'var(--canvas)' }}>
-                    <div style={{ fontWeight: 600 }}>
-                      P{q.priority}. {q.question_text}
-                    </div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--ink-muted)', marginTop: '0.2rem' }}>{q.reason}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {clarifyResult.safe_defaults.length > 0 && (
-              <div style={{ fontSize: '0.82rem', color: 'var(--ink-secondary)', borderTop: '1px solid var(--rule)', paddingTop: '0.6rem' }}>
-                <strong>Safe Default Suggestions (not confirmed facts): </strong>
-                {clarifyResult.safe_defaults.map((d) => `${d.label} — ${d.rationale}`).join(' | ')}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+  const pointX = (x: number) => 58 + (x + 1.1) * 291;
+  const pointY = (y: number) => 310 - (y + 1.1) * 125;
+  const points = searchResult?.projection_points ?? [];
+  const base = points.find(p => p.case_id === 'QUERY_BASE');
+  const steered = points.find(p => p.case_id === 'QUERY_STEERED');
+  const selected = searchResult?.results.find(hit => hit.case.case_id === selectedCaseId);
+  const samples = ['50 industrial fans Manipal urgent Friday Udupi shortage', '20 submersible pumps Kundapura urgent irrigation', '100 bulk fans Mangalore single load'];
+  const clarificationSamples = ['Send 50 fans to Manipal by Friday', 'Send 50 FAN-HV-24-IND industrial fans to Manipal by 2026-11-27 arrival at dock, split delivery ok', 'Need 50 fans to Manipal all together in single load, split delivery ok', 'Send some items soon'];
+  return <article className="analyst">
+    <header><small>Case retrieval / Analyst workspace</small><h1>Case steering</h1></header>
+    <label className="query-line">Query<input list="query-samples" value={query} onChange={e => setQuery(e.target.value)}/></label>
+    <datalist id="query-samples">{samples.map(s => <option key={s}>{s}</option>)}</datalist>
+    <div className="steering-line">
+      <select aria-label="Steering direction" value={steeringDirection} onChange={e => setSteeringDirection(e.target.value)}>{STEERING_PRESETS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select>
+      <span>Away</span><input id="steering-slider" aria-label="Steering strength" type="range" min="-1.5" max="1.5" step=".1" value={steeringStrength} onChange={e => setSteeringStrength(Number(e.target.value))}/><span>Toward</span><output>{steeringStrength.toFixed(1)}</output>
     </div>
-  );
+    {searchError && <p role="alert">{searchError}</p>}
+    <div className="analysis-grid">
+      <section><h2>Case similarity</h2><p>Historical cases on a fixed projection</p>
+        <svg viewBox="0 0 726 370" className="projection" aria-label="Interactive case projection">
+          {[-1,-.5,0,.5,1].map(v => <g key={v} stroke="#dbe1e8"><path d={`M ${pointX(v)} 33 V310 M58 ${pointY(v)} H700`}/><g stroke="none" fill="#526079" fontSize="13"><text x={pointX(v)} y="331" textAnchor="middle">{v}</text><text x="48" y={pointY(v)+4} textAnchor="end">{v}</text></g></g>)}
+          <path d="M58 33V310H700" stroke="#657388" fill="none"/><text x="370" y="358" textAnchor="middle">Component 1</text><text transform="translate(16 170) rotate(-90)" textAnchor="middle">Component 2</text>
+          {points.filter(p => !p.is_query && !p.is_steered_query && !p.case_id.startsWith('QUERY_')).map(p => <g key={p.case_id} role="button" tabIndex={0} aria-label={p.label} aria-pressed={selectedCaseId === p.case_id} onKeyDown={e => {if (['Enter',' '].includes(e.key)) {e.preventDefault();setSelectedCaseId(p.case_id);}}} onClick={() => setSelectedCaseId(p.case_id)}>
+            <circle cx={pointX(p.x)} cy={pointY(p.y)} r="12" fill="transparent"/><circle cx={pointX(p.x)} cy={pointY(p.y)} r={selectedCaseId === p.case_id ? 8 : 5.5} fill={selectedCaseId === p.case_id ? 'var(--cobalt)' : 'var(--ink)'}/><title>{p.label}</title>
+          </g>)}
+          {base && steered && <line x1={pointX(base.x)} y1={pointY(base.y)} x2={pointX(steered.x)} y2={pointY(steered.y)} stroke="var(--cobalt)" strokeDasharray="3 4" strokeWidth="2"/>}
+          {base && <circle cx={pointX(base.x)} cy={pointY(base.y)} r="7" fill="white" stroke="var(--cobalt)" strokeWidth="3"/>}
+          {steered && <path transform={`translate(${pointX(steered.x)} ${pointY(steered.y)})`} d="M0 -9 9 0 0 9 -9 0Z" fill="var(--cobalt)" stroke="white"/>}
+        </svg>
+        <div className="plot-key"><span>◯　Original query</span><span>◆　Steered query</span><span>●　Historical case</span></div>
+        {selectedCaseId && <p className="case-detail"><strong>{selected?.case.title ?? points.find(p => p.case_id === selectedCaseId)?.label}</strong><br/>{selected ? <>{selected.case.origin_hub} → {selected.case.destination_hub} · {RESOLUTION_LABELS[selected.case.resolution_type] ?? selected.case.resolution_type}<br/>Base {selected.base_similarity_score.toFixed(3)} · Rank change {selected.rank_delta}</> : 'Outside the returned rankings'}</p>}
+      </section>
+      <section><h2>Retrieved cases</h2><div className="ranking"><small>#　 Historical case</small><small>Similarity</small></div>
+        <div className="rank-list">{searchResult?.results.map(h => <button key={h.case.case_id} aria-pressed={selectedCaseId === h.case.case_id} onClick={() => setSelectedCaseId(h.case.case_id)}><b>{h.rank}</b><span><strong>{h.case.title}</strong><small>{h.case.outcome_summary}</small></span><output>{h.similarity_score.toFixed(3)}</output></button>)}</div>
+      </section>
+    </div>
+    <section className="clarification"><small>Clarification</small><h2>{clarifyResult?.questions[0]?.question_text || clarifyResult?.brief_explanation || 'Review request'}</h2>
+      {clarifyResult?.questions.map(q => <div key={q.question_id}>{q !== clarifyResult.questions[0] && <strong>{q.question_text}</strong>}<p>{q.reason}</p>{q.options.map(o => <button key={o.id} className="btn-secondary" onClick={() => setClarifyInput(text => (q.field === 'must_arrive_together' ? text.replace(/all together|single load|no split|split ok|split delivery ok|split fine/gi, '') : text) + ', ' + o.label)}>{o.label}</button>)}</div>)}
+      <label>Request text<input aria-label="Clarification request text" list="clarify-samples" value={clarifyInput} onChange={e => setClarifyInput(e.target.value)}/></label><datalist id="clarify-samples">{clarificationSamples.map(s => <option key={s}>{s}</option>)}</datalist>
+      {clarifyError && <p role="alert">{clarifyError}</p>}
+      {clarifyResult && <details><summary>Analysis and suggested defaults</summary><p>{clarifyResult.brief_explanation} · Confidence {Math.round(clarifyResult.confidence * 100)}% · Can proceed: {clarifyResult.can_proceed ? 'Yes' : 'No'}</p>{clarifyResult.safe_defaults.map(d => <p key={d.field}>{d.label} — {d.rationale}</p>)}</details>}
+    </section>
+  </article>;
 };

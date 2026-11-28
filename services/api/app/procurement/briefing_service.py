@@ -256,7 +256,7 @@ async def generate_role_briefing(
             f"based strictly on the supplied live metrics and evidence items. "
             f"Do not invent any figures."
         ),
-        system_instruction="You are an enterprise operations analyst. Cite only provided evidence.",
+        system_instruction="You are an enterprise operations analyst. Cite only provided evidence. Write a one-sentence executive summary. Keep explanation null and data, quantities and monetary_values empty; the application renders detailed metrics separately.",
         evidence=evidence_items,
         authoritative_metrics=AuthoritativeMetrics(
             quantities={

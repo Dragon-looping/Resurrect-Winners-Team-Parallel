@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { PlannerIntakeRequest, PlannerOrder } from '../types/planner.ts';
 import { PRODUCT_CATALOG, findCatalogItem } from '../../customer/fixtures/catalog.ts';
-import { ArrowRightIcon } from '../../shared/icons.tsx';
+import { ArrowRightIcon, AlertIcon } from '../../shared/icons.tsx';
 
 interface OrderQueuePanelProps {
   orders: PlannerOrder[];
@@ -9,6 +9,7 @@ interface OrderQueuePanelProps {
   onSelectOrder: (orderId: string) => void;
   onCreateOrder: (req: PlannerIntakeRequest) => Promise<void>;
   isSubmitting?: boolean;
+  error?: string | null;
 }
 
 const RISK_LABELS: Record<PlannerOrder['riskStatus'], { text: string; color: string; bg: string }> = {
@@ -24,7 +25,8 @@ export const OrderQueuePanel: React.FC<OrderQueuePanelProps> = ({
   activeOrderId,
   onSelectOrder,
   onCreateOrder,
-  isSubmitting = false
+  isSubmitting = false,
+  error = null
 }) => {
   const [showIntake, setShowIntake] = useState(false);
   const [sku, setSku] = useState(PRODUCT_CATALOG[0].sku);
@@ -147,6 +149,19 @@ export const OrderQueuePanel: React.FC<OrderQueuePanelProps> = ({
             <ArrowRightIcon size={14} />
           </button>
         </form>
+      )}
+
+      {error && (
+        <div style={{ padding: '0.85rem 1rem', background: 'var(--oxide-red-subtle)', border: '1px solid var(--oxide-red)', color: 'var(--oxide-red)', marginBottom: '1rem', fontSize: '0.84rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <AlertIcon size={16} color="var(--oxide-red)" />
+          <span>Failed to load order queue: {error}</span>
+        </div>
+      )}
+
+      {orders.length === 0 && (
+        <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--ink-muted)', background: 'var(--surface-subtle)', border: '1px dashed var(--rule)', marginBottom: '1rem' }}>
+          {error ? `Queue unavailable (${error})` : 'No outstanding orders found in queue.'}
+        </div>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.75rem' }}>

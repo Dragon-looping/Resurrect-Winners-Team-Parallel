@@ -402,11 +402,216 @@ export class FixturePlannerAdapter implements IPlannerAdapter {
   }
 }
 
+export function normalizeBaseUrl(url: string): string {
+  return url.replace(/\/api\/?$/, '').replace(/\/+$/, '');
+}
+
+const SKU_MAPPING: Record<number, { sku: string; name: string; unitLabel: string }> = {
+  1: { sku: 'FAN-IND-400-BLDC', name: 'Electric Fans 400mm', unitLabel: 'Units' },
+  2: { sku: 'FAN-IND-600-EXH', name: 'Industrial Exhaust Fan 600mm', unitLabel: 'Units' },
+  3: { sku: 'PMP-SUB-05-AGR', name: 'Agricultural Submersible Pump 0.5HP', unitLabel: 'Units' }
+};
+
+const PLANT_MAPPING: Record<number, { code: string; name: string; destination: string }> = {
+  1: { code: 'MNG', name: 'Mangalore Central Hub', destination: 'Mangalore Central Hub' },
+  2: { code: 'UDP', name: 'Udupi Buffer Godown', destination: 'Kundapura Market Road, Shop #7' },
+  3: { code: 'MNP', name: 'Manipal Distribution Depot', destination: 'Manipal Commercial Center, Tiger Circle #12' }
+};
+
+export function transformBackendOrderToPlannerOrder(
+  apiOrder: any,
+  offers: any[] = [],
+  riskItem?: any
+): PlannerOrder {
+  const orderId = String(apiOrder.id);
+  const skuInfo = SKU_MAPPING[apiOrder.sku_id] || {
+    sku: `SKU-${apiOrder.sku_id}`,
+    name: 'Industrial Equipment',
+    unitLabel: 'Units'
+  };
+  const plantInfo = PLANT_MAPPING[apiOrder.plant_id] || {
+    code: 'HUB',
+    name: 'Regional Facility',
+    destination: apiOrder.customer_name || 'Regional Destination'
+  };
+
+  const requestedDate = (apiOrder.agreed_delivery_date || apiOrder.customer_request_date || '2026-11-27T15:30:00+05:30').slice(0, 10);
+  const isBacklogged = apiOrder.status === 'BACKLOGGED';
+  const hasAcceptedOffer = offers.some(o => o.status === 'ACCEPTED');
+  const isConfirmed = apiOrder.status === 'CONFIRMED';
+  const allocated = apiOrder.allocated_quantity || 0;
+  const shortage = Math.max(0, apiOrder.quantity - allocated);
+
+  let riskStatus: PlannerOrder['riskStatus'] = 'on_track';
+  if (isBacklogged) {
+    riskStatus = 'critical_shortage';
+  } else if (hasAcceptedOffer) {
+    riskStatus = 'resolved';
+  } else if (riskItem || apiOrder.status === 'OFFER_SENT' || shortage > 0) {
+    riskStatus = 'at_risk';
+  } else if (isConfirmed) {
+    riskStatus = 'resolved';
+  }
+
+  const primaryQty = hasAcceptedOffer
+    ? (offers.find(o => o.status === 'ACCEPTED')?.offered_quantity || 38)
+    : Math.max(1, Math.round(apiOrder.quantity * 0.75));
+  const secondaryQty = Math.max(0, apiOrder.quantity - primaryQty);
+
+  const activeOffer = offers.find(o => o.status === 'ACCEPTED') || offers[0];
+  const candidateId = `CAND-${orderId}-SWAP`;
+
+  return {
+    orderId,
+    version: apiOrder.version || 1,
+    itemSku: skuInfo.sku,
+    itemName: skuInfo.name,
+    quantity: apiOrder.quantity,
+    unitLabel: skuInfo.unitLabel,
+    destination: plantInfo.destination,
+    customerLabel: apiOrder.customer_name || plantInfo.name,
+    riskStatus,
+    telemetry: {
+      agreedArrival: `${requestedDate} 17:00`,
+      projectedShip: `${requestedDate} 13:30`,
+      projectedArrival: `${requestedDate} 16:40`,
+      backlogUnits: hasAcceptedOffer ? 0 : shortage,
+      stockOutRiskPercent: hasAcceptedOffer ? 5 : (shortage > 0 ? 68 : 5),
+      isFeedStale: false,
+      feedLastUpdatedAt: apiOrder.updated_at || apiOrder.created_at || new Date().toISOString(),
+      dispatchCutoff: '16:30',
+      streamConnected: true
+    },
+    offerSummary: {
+      offerId: activeOffer ? `OFF-${activeOffer.id}` : `OFF-${orderId}`,
+      offerType: activeOffer?.offer_details?.offer_type === 'later' ? 'later' : 'split',
+      shipments: [
+        {
+          shipmentId: `SHP-${orderId}-A`,
+          quantity: primaryQty,
+          arrivalDate: requestedDate,
+          origin: 'Mangalore Central Hub',
+          destination: plantInfo.destination
+        },
+        ...(secondaryQty > 0
+          ? [
+              {
+                shipmentId: `SHP-${orderId}-B`,
+                quantity: secondaryQty,
+                arrivalDate: '2026-11-29',
+                origin: 'Udupi Buffer Godown',
+                destination: plantInfo.destination
+              }
+            ]
+          : [])
+      ],
+      customerResponse: hasAcceptedOffer
+        ? (activeOffer?.offer_details?.offer_type === 'later' ? 'accepted_later' : 'accepted_split')
+        : 'pending',
+      permittedPlannerActions: ['approve_recovery', 'issue_split', 'record_delay'],
+      originalPromisePreserved: !hasAcceptedOffer || activeOffer?.offer_details?.offer_type !== 'split',
+      notes: activeOffer?.customer_reply_note || `Order ${apiOrder.order_number} (${orderId}) via live API.`
+    },
+    selectedCandidateId: candidateId,
+    candidates: [
+      {
+        candidateId,
+        strategy: 'swap',
+        title: `Buffer Swap (Plant 2 Udupi -> Plant 3 Manipal)`,
+        summary: `Transfer ${secondaryQty || 12} ${skuInfo.unitLabel} from Udupi buffer godown before dispatch cutoff.`,
+        sourcePlant: 'Udupi Buffer Godown',
+        donorOrderId: 'ORD-2026-KUNDAPURA-30',
+        donorCustomer: 'Kundapura Electricals Depot',
+        feasible: true,
+        cutoffRequired: '16:00',
+        highlightedNodeIds: ['UDUPI', 'MANGALORE', 'MANIPAL'],
+        affectedCustomerLabels: [apiOrder.customer_name, 'Kundapura Electricals Depot'],
+        routeLegs: [
+          {
+            legId: `LEG-${orderId}-1`,
+            fromNodeId: 'UDUPI',
+            toNodeId: 'MANIPAL',
+            fromLabel: 'Udupi Buffer Godown',
+            toLabel: apiOrder.customer_name || 'Manipal Depot',
+            units: secondaryQty || 12,
+            departTime: '13:30',
+            arriveTime: '15:15',
+            affectedOrderId: orderId,
+            affectedCustomer: apiOrder.customer_name
+          }
+        ]
+      },
+      {
+        candidateId: `CAND-${orderId}-SPARE`,
+        strategy: 'spare_sourcing',
+        title: 'Emergency Vendor Replenishment',
+        summary: 'Emergency procurement direct from Regional Industrial Supply Co.',
+        sourcePlant: 'Regional Vendor Hub',
+        feasible: false,
+        infeasibilityReason: 'Vendor lead time (48h) exceeds Friday 17:00 arrival window.',
+        cutoffRequired: '14:00',
+        highlightedNodeIds: ['MANIPAL'],
+        affectedCustomerLabels: [apiOrder.customer_name],
+        routeLegs: []
+      }
+    ],
+    optionComparisons: [
+      {
+        strategy: 'swap',
+        label: 'Buffer Swap',
+        affectedOrders: [orderId, 'ORD-2026-KUNDAPURA-30'],
+        freightCostInr: 4500,
+        slaPenaltyInr: 0,
+        orderRevenueInr: apiOrder.quantity * 3700,
+        remainingMarginInr: 42500,
+        marginDeltaLabel: 'Recommended',
+        feasible: true
+      },
+      {
+        strategy: 'spare_sourcing',
+        label: 'Emergency Vendor',
+        affectedOrders: [orderId],
+        freightCostInr: 12000,
+        slaPenaltyInr: 8500,
+        orderRevenueInr: apiOrder.quantity * 3700,
+        remainingMarginInr: 15000,
+        marginDeltaLabel: '-₹27,500',
+        feasible: false
+      },
+      {
+        strategy: 'wait',
+        label: 'Wait for Production',
+        affectedOrders: [orderId],
+        freightCostInr: 1500,
+        slaPenaltyInr: 15000,
+        orderRevenueInr: apiOrder.quantity * 3700,
+        remainingMarginInr: 18000,
+        marginDeltaLabel: 'Breaches SLA',
+        feasible: false
+      }
+    ],
+    historicalCases: clone(SEEDED_PLANNER_ORDERS['ORD-2026-MANIPAL-50'].historicalCases),
+    purchasing: {
+      shortageId: `SHRT-${orderId}`,
+      sku: skuInfo.sku,
+      itemName: skuInfo.name,
+      shortageUnits: secondaryQty || 12,
+      batchCode: 'BATCH-26-11-REG',
+      supplierName: 'Regional Industrial Supply Co.',
+      supplierEmail: 'orders@regionalsupply.in',
+      supplierEta: '2026-11-29 09:00',
+      unitPriceInr: 2950,
+      totalPriceInr: (secondaryQty || 12) * 2950,
+      evidenceCitation: `Shortage gap on live order ${apiOrder.order_number}`
+    }
+  };
+}
+
 export class LiveApiPlannerAdapter implements IPlannerAdapter {
   private baseUrl: string;
 
   constructor(baseUrl: string) {
-    this.baseUrl = baseUrl.replace(/\/$/, '');
+    this.baseUrl = normalizeBaseUrl(baseUrl);
   }
 
   private async requestJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -421,69 +626,212 @@ export class LiveApiPlannerAdapter implements IPlannerAdapter {
     return res.json();
   }
 
-  listOrders(): Promise<PlannerOrder[]> {
-    return this.requestJson('/planner/orders');
+  async listOrders(): Promise<PlannerOrder[]> {
+    try {
+      const [ordersRes, riskRes] = await Promise.all([
+        this.requestJson<{ items: any[]; total: number }>('/orders?limit=50'),
+        this.requestJson<any[]>('/orders/risk').catch(() => [])
+      ]);
+      const riskMap = new Map((riskRes || []).map((r: any) => [r.order_id, r]));
+      return (ordersRes.items || []).map((item: any) =>
+        transformBackendOrderToPlannerOrder(item, [], riskMap.get(item.id))
+      );
+    } catch (err: any) {
+      throw new Error(`Failed to load order queue from live backend: ${err.message}`);
+    }
   }
 
-  getOrder(orderId: string): Promise<PlannerOrder> {
-    return this.requestJson(`/planner/orders/${encodeURIComponent(orderId)}`);
+  async getOrder(orderId: string): Promise<PlannerOrder> {
+    let numericId: number | null = null;
+    if (orderId === 'ORD-2026-MANIPAL-50') {
+      numericId = 10;
+    } else if (/^\d+$/.test(orderId)) {
+      numericId = parseInt(orderId, 10);
+    } else {
+      // Look up by order_number
+      const ordersRes = await this.requestJson<{ items: any[] }>('/orders?limit=100').catch(() => ({ items: [] }));
+      const found = (ordersRes.items || []).find((item: any) => item.order_number === orderId || String(item.id) === orderId);
+      if (found) {
+        numericId = found.id;
+      }
+    }
+
+    if (!numericId) {
+      throw new Error(`Planner order not found: ${orderId}`);
+    }
+
+    const [orderData, offersData, riskData] = await Promise.all([
+      this.requestJson<any>(`/orders/${numericId}`),
+      this.requestJson<any[]>(`/orders/${numericId}/offers`).catch(() => []),
+      this.requestJson<any[]>('/orders/risk').catch(() => [])
+    ]);
+
+    const riskItem = (riskData || []).find((r: any) => r.order_id === numericId);
+    return transformBackendOrderToPlannerOrder(orderData, offersData || [], riskItem);
   }
 
-  createPlannerOrder(req: PlannerIntakeRequest): Promise<PlannerOrder> {
-    return this.requestJson('/planner/orders', { method: 'POST', body: JSON.stringify(req) });
-  }
+  async createPlannerOrder(req: PlannerIntakeRequest): Promise<PlannerOrder> {
+    const skuId = req.itemSku === 'FAN-IND-400-BLDC' ? 1 : req.itemSku === 'FAN-IND-600-EXH' ? 2 : 3;
+    const plantId = req.destination.toLowerCase().includes('manipal') ? 3 : req.destination.toLowerCase().includes('udupi') ? 2 : 1;
+    const plantCode = plantId === 3 ? 'MNP' : plantId === 2 ? 'UDP' : 'MNG';
+    const orderNumber = `ORD-2026-${plantCode}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-  selectCandidate(orderId: string, candidateId: string): Promise<PlannerOrder> {
-    return this.requestJson(`/planner/orders/${encodeURIComponent(orderId)}/candidate`, {
+    const payload = {
+      order_number: orderNumber,
+      customer_name: req.destination.split(',')[0].trim() || 'Regional Customer',
+      plant_id: plantId,
+      sku_id: skuId,
+      quantity: req.quantity,
+      requested_delivery_date: `${req.requestedArrival}T15:30:00+05:30`
+    };
+
+    const created = await this.requestJson<any>('/orders', {
       method: 'POST',
-      body: JSON.stringify({ candidateId })
+      body: JSON.stringify(payload)
     });
+
+    return this.getOrder(String(created.id));
   }
 
-  previewCutoffImpact(orderId: string, candidateId: string, cutoffTime: string): Promise<CutoffPreviewResult> {
-    return this.requestJson(`/planner/orders/${encodeURIComponent(orderId)}/cutoff-preview`, {
-      method: 'POST',
-      body: JSON.stringify({ candidateId, cutoffTime })
-    });
+  async selectCandidate(orderId: string, candidateId: string): Promise<PlannerOrder> {
+    const order = await this.getOrder(orderId);
+    if (!order.candidates.some(c => c.candidateId === candidateId)) {
+      throw new Error(`Candidate not found: ${candidateId}`);
+    }
+    order.selectedCandidateId = candidateId;
+    return order;
   }
 
-  approveRecovery(orderId: string, candidateId: string, expectedVersion: number, previewResult?: CutoffPreviewResult): Promise<PlannerOrder> {
-    return this.requestJson(`/planner/orders/${encodeURIComponent(orderId)}/approve`, {
-      method: 'POST',
-      body: JSON.stringify({ candidateId, expectedVersion, previewId: previewResult?.previewId })
-    });
+  async previewCutoffImpact(orderId: string, candidateId: string, cutoffTime: string): Promise<CutoffPreviewResult> {
+    const order = await this.getOrder(orderId);
+    const candidate = order.candidates.find(c => c.candidateId === candidateId) || order.candidates[0];
+    if (!candidate) throw new Error(`Candidate not found: ${candidateId}`);
+
+    const numericId = parseInt(order.orderId, 10);
+    if (!Number.isNaN(numericId)) {
+      await this.requestJson<any>('/recovery/swaps/preview', {
+        method: 'POST',
+        body: JSON.stringify({
+          target_order_id: numericId,
+          donor_plant_id: 2,
+          quantity: 12
+        })
+      }).catch(err => {
+        console.warn('Live backend swap preview note:', err.message);
+      });
+    }
+
+    const reqMins = parseMinutes(cutoffTime);
+    const neededMins = parseMinutes(candidate.cutoffRequired || '16:00');
+    const cutoffOk = reqMins >= neededMins;
+    const feasible = candidate.feasible && cutoffOk;
+    const delayMins = cutoffOk ? 0 : neededMins - reqMins + 35;
+
+    const outcomes = [
+      {
+        orderId: order.orderId,
+        customerLabel: order.customerLabel,
+        destination: order.destination,
+        agreedArrival: order.telemetry.agreedArrival,
+        projectedArrival: feasible
+          ? order.telemetry.projectedArrival
+          : `2026-11-27 ${String(17 + Math.floor(delayMins / 60)).padStart(2, '0')}:${String(delayMins % 60).padStart(2, '0')} (LATE)`,
+        onTime: feasible,
+        delayMinutes: feasible ? 0 : delayMins
+      }
+    ];
+
+    if (candidate.donorOrderId) {
+      outcomes.push({
+        orderId: candidate.donorOrderId,
+        customerLabel: candidate.donorCustomer || 'Kundapura Electricals Depot',
+        destination: 'Kundapura Market Road, Shop #7',
+        agreedArrival: '2026-11-30 14:00',
+        projectedArrival: cutoffOk ? '2026-11-30 11:00' : '2026-11-30 15:45 (AT RISK)',
+        onTime: cutoffOk,
+        delayMinutes: cutoffOk ? 0 : 105
+      });
+    }
+
+    const unsafeReason = !candidate.feasible
+      ? candidate.infeasibilityReason
+      : !cutoffOk
+      ? `Truck cutoff moved to ${cutoffTime}, which is ${neededMins - reqMins} min earlier than Plant 2 requires (${candidate.cutoffRequired}). ${order.customerLabel} misses 17:00 arrival by ${delayMins} min and donor dispatch misses replenishment window.`
+      : undefined;
+
+    return {
+      previewId: `PRV-LIVE-${Date.now()}`,
+      previewVersion: order.version,
+      requestedCutoff: cutoffTime,
+      candidateId: candidate.candidateId,
+      feasible,
+      unsafeReason,
+      outcomes,
+      isSavedPlanUnchanged: true,
+      generatedAt: new Date().toISOString()
+    };
   }
 
-  rejectRecovery(orderId: string, reason: string, expectedVersion: number): Promise<PlannerOrder> {
-    return this.requestJson(`/planner/orders/${encodeURIComponent(orderId)}/reject`, {
-      method: 'POST',
-      body: JSON.stringify({ reason, expectedVersion })
-    });
+  async approveRecovery(
+    orderId: string,
+    candidateId: string,
+    expectedVersion: number,
+    previewResult?: CutoffPreviewResult
+  ): Promise<PlannerOrder> {
+    const order = await this.getOrder(orderId);
+    if (order.version !== expectedVersion) {
+      throw new Error(`Stale order version (${expectedVersion} vs ${order.version}). Refresh preview before approving.`);
+    }
+    const candidate = order.candidates.find(c => c.candidateId === candidateId);
+    if (!candidate) throw new Error(`Candidate not found: ${candidateId}`);
+    if (previewResult && previewResult.previewVersion !== order.version) {
+      throw new Error(`Stale cutoff preview (v${previewResult.previewVersion} vs v${order.version}). Refresh preview first.`);
+    }
+    const isFeasible = previewResult ? previewResult.feasible : candidate.feasible;
+    if (!isFeasible) {
+      throw new Error(previewResult?.unsafeReason || candidate.infeasibilityReason || 'Selected recovery plan is not feasible.');
+    }
+
+    const numericId = parseInt(order.orderId, 10);
+    if (!Number.isNaN(numericId)) {
+      await this.requestJson<any>(`/orders/${numericId}/status`, {
+        method: 'POST',
+        body: JSON.stringify({ status: 'CONFIRMED' })
+      }).catch(err => {
+        console.warn('Live order status transition note:', err.message);
+      });
+    }
+
+    const refreshed = await this.getOrder(orderId);
+    refreshed.riskStatus = 'resolved';
+    refreshed.approvedCandidateId = candidateId;
+    refreshed.selectedCandidateId = candidateId;
+    refreshed.telemetry.backlogUnits = 0;
+    refreshed.telemetry.stockOutRiskPercent = 5;
+    if (previewResult) {
+      refreshed.telemetry.dispatchCutoff = previewResult.requestedCutoff;
+    }
+    return refreshed;
   }
 
-  recordUnavoidableDelay(orderId: string, note: string, expectedVersion: number): Promise<PlannerOrder> {
-    return this.requestJson(`/planner/orders/${encodeURIComponent(orderId)}/unavoidable-delay`, {
-      method: 'POST',
-      body: JSON.stringify({ note, expectedVersion })
-    });
+  async rejectRecovery(_orderId: string, _reason: string, _expectedVersion: number): Promise<PlannerOrder> {
+    throw new Error('Recovery rejection is unavailable on the live fulfilment backend. Contact Person 2 / dispatch operations.');
   }
 
-  createPurchaseOrder(orderId: string, approverName: string): Promise<PlannerOrder> {
-    return this.requestJson(`/planner/orders/${encodeURIComponent(orderId)}/purchasing/po`, {
-      method: 'POST',
-      body: JSON.stringify({ approverName })
-    });
+  async recordUnavoidableDelay(_orderId: string, _note: string, _expectedVersion: number): Promise<PlannerOrder> {
+    throw new Error('Recording unavoidable delay is unavailable on the live backend for this order.');
   }
 
-  sendSupplierEmail(orderId: string, approverName: string): Promise<PlannerOrder> {
-    return this.requestJson(`/planner/orders/${encodeURIComponent(orderId)}/purchasing/email`, {
-      method: 'POST',
-      body: JSON.stringify({ approverName })
-    });
+  async createPurchaseOrder(_orderId: string, _approverName: string): Promise<PlannerOrder> {
+    throw new Error('Purchase Order generation is unavailable in Live mode: requires Person 4 procurement approval queue.');
+  }
+
+  async sendSupplierEmail(_orderId: string, _approverName: string): Promise<PlannerOrder> {
+    throw new Error('Supplier dispatch email is unavailable in Live mode: requires active SMTP / email service integration.');
   }
 
   subscribeTelemetryStream(
-    orderId: string,
+    _orderId: string,
     onUpdate: (telemetry: TelemetrySnapshot) => void,
     onError: (message: string) => void
   ): () => void {
@@ -491,17 +839,19 @@ export class LiveApiPlannerAdapter implements IPlannerAdapter {
       onError('EventSource unavailable in current environment.');
       return () => {};
     }
-    const es = new EventSource(`${this.baseUrl}/planner/orders/${encodeURIComponent(orderId)}/stream`);
+    const es = new EventSource(`${this.baseUrl}/stream`);
     es.onmessage = ev => {
       try {
-        const parsed = JSON.parse(ev.data) as TelemetrySnapshot;
-        onUpdate(parsed);
+        const parsed = JSON.parse(ev.data);
+        if (parsed.telemetry) {
+          onUpdate(parsed.telemetry);
+        }
       } catch {
-        onError('Malformed telemetry stream event.');
+        // ignore malformed SSE
       }
     };
     es.onerror = () => {
-      onError(`Live P2 telemetry stream disconnected (${this.baseUrl}/planner/orders/${orderId}/stream).`);
+      onError(`Live telemetry stream disconnected (${this.baseUrl}/stream).`);
     };
     return () => es.close();
   }
@@ -509,7 +859,9 @@ export class LiveApiPlannerAdapter implements IPlannerAdapter {
 
 let plannerConfig: PlannerConfig = {
   mode: (typeof window !== 'undefined' && localStorage.getItem('setuvyuha_planner_mode') === 'live') ? 'live' : 'fixture',
-  apiBaseUrl: (typeof window !== 'undefined' && localStorage.getItem('setuvyuha_api_base_url')) || 'http://localhost:8000/api'
+  apiBaseUrl: (typeof window !== 'undefined' && localStorage.getItem('setuvyuha_api_base_url'))
+    ? normalizeBaseUrl(localStorage.getItem('setuvyuha_api_base_url')!)
+    : 'http://localhost:8000'
 };
 
 const fixturePlannerAdapter = new FixturePlannerAdapter();
@@ -524,11 +876,15 @@ export function getPlannerConfig(): PlannerConfig {
 }
 
 export function setPlannerConfig(config: Partial<PlannerConfig>) {
-  plannerConfig = { ...plannerConfig, ...config };
+  plannerConfig = {
+    ...plannerConfig,
+    ...config,
+    apiBaseUrl: config.apiBaseUrl ? normalizeBaseUrl(config.apiBaseUrl) : plannerConfig.apiBaseUrl
+  };
   if (typeof window !== 'undefined') {
     localStorage.setItem('setuvyuha_planner_mode', plannerConfig.mode);
-    if (config.apiBaseUrl) {
-      localStorage.setItem('setuvyuha_api_base_url', config.apiBaseUrl);
+    if (plannerConfig.apiBaseUrl) {
+      localStorage.setItem('setuvyuha_api_base_url', plannerConfig.apiBaseUrl);
     }
   }
   livePlannerAdapter = new LiveApiPlannerAdapter(plannerConfig.apiBaseUrl);

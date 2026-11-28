@@ -99,9 +99,14 @@ class GatewayConfig:
             )
         if self.provider_timeout_seconds <= 0:
             raise AIConfigurationError("AI_PROVIDER_TIMEOUT must be greater than 0.")
-        if self.provider_timeout_seconds > MAX_PROVIDER_TIMEOUT_SECONDS:
+        # With only Gemini configured, an explicitly longer attempt can use
+        # the time otherwise reserved for failover.
+        attempt_limit = MAX_PROVIDER_TIMEOUT_SECONDS
+        if self.primary_provider == ProviderName.GEMINI and self.gemini.is_configured and not self.groq.is_configured:
+            attempt_limit = self.request_timeout_seconds
+        if self.provider_timeout_seconds > attempt_limit:
             raise AIConfigurationError(
-                f"AI_PROVIDER_TIMEOUT cannot exceed {MAX_PROVIDER_TIMEOUT_SECONDS} seconds."
+                f"AI_PROVIDER_TIMEOUT cannot exceed {attempt_limit} seconds."
             )
         if self.provider_timeout_seconds > self.request_timeout_seconds:
             raise AIConfigurationError(

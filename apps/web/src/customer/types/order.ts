@@ -65,6 +65,10 @@ export interface CustomerOrder {
   requestedDetails: DeliveryRequest;
   clarificationPrompt?: ClarificationPrompt;
   activeOffer?: OfferProposal;
+  availableOffers?: {
+    split?: OfferProposal;
+    later?: OfferProposal;
+  };
   confirmedShipments?: ShipmentItem[];
   backlogQuantity?: number;
   customerDelayReason?: string;

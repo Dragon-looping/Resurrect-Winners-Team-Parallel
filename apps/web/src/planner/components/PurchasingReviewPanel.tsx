@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getPlannerAdapter } from '../adapters/plannerAdapter.ts';
+import { getPlannerAdapter, getPlannerConfig } from '../adapters/plannerAdapter.ts';
 import { PlannerOrder } from '../types/planner.ts';
 import { CheckIcon, AlertIcon } from '../../shared/icons.tsx';
 
@@ -80,8 +80,13 @@ export const PurchasingReviewPanel: React.FC<PurchasingReviewPanelProps> = ({
           Purchasing Review
         </h2>
         <p style={{ fontSize: '0.82rem', color: 'var(--ink-muted)' }}>
-          PO creation and email dispatch each require a separate explicit approval. Live endpoints: <code>POST /planner/orders/{'{id}'}/purchasing/po</code> and <code>/purchasing/email</code> (pending P2).
+          PO creation and email dispatch each require a separate explicit approval.
         </p>
+        {getPlannerConfig().mode === 'live' && (
+          <div style={{ marginTop: '0.5rem', padding: '0.45rem 0.65rem', background: 'var(--surface-subtle)', border: '1px dashed var(--rule-dark)', color: 'var(--ink-muted)', fontSize: '0.78rem' }}>
+            ℹ Unavailable in Live mode: PO approval and supplier dispatches require Person 4 procurement workflow.
+          </div>
+        )}
       </div>
 
       {/* Shortage info */}

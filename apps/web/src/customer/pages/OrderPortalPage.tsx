@@ -32,8 +32,13 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
       const adapter = getOrderAdapter();
       const data = await adapter.getOrder(orderId);
       setOrder(data);
+      return data;
     } catch (err: any) {
-      setError(err.message || `Failed to fetch order ${orderId}`);
+      const msg = err.message || `Failed to fetch order ${orderId}`;
+      setError(msg);
+      if (showRefreshingState) {
+        throw new Error(msg);
+      }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -63,14 +68,15 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
   };
 
   const handleOfferDecision = async (decision: CustomerDecision) => {
-    if (!order || !order.activeOffer || isSubmitting) return; // Guard double clicks
+    if (!order || isSubmitting) return; // Guard double clicks
+    if (!order.activeOffer && order.status !== 'recovery_pending') return;
     setIsSubmitting(true);
     setError(null);
     try {
       const adapter = getOrderAdapter();
       const updated = await adapter.replyToOffer(order.orderId, {
-        offerId: order.activeOffer.offerId,
-        offerVersion: order.activeOffer.version,
+        offerId: order.activeOffer?.offerId || `OFF-${order.orderId}`,
+        offerVersion: order.activeOffer?.version || order.version,
         decision
       });
       setOrder(updated);
@@ -268,7 +274,7 @@ export const OrderPortalPage: React.FC<OrderPortalPageProps> = ({ orderId, onNav
           <RecoveryPendingCard
             order={order}
             onDecision={handleOfferDecision}
-            onRefresh={() => fetchOrder(true)}
+            onRefresh={async () => { await fetchOrder(true); }}
             isSubmitting={isSubmitting}
           />
         ) : order.status === 'offer_issued' && order.activeOffer && order.activeOffer.offerType === 'later' ? (

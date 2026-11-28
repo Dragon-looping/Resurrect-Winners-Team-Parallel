@@ -46,7 +46,12 @@ class GeminiAdapter(ProviderAdapter):
             ) from exc
 
         timeout_ms = max(1, int(round(timeout_seconds * 1000)))
-        http_kwargs: dict[str, Any] = {"timeout": timeout_ms}
+        # Gemini requires a server deadline of at least 10s. Keep the shorter
+        # client timeout and asyncio deadline for gateway failover.
+        http_kwargs: dict[str, Any] = {
+            "timeout": timeout_ms,
+            "headers": {"X-Server-Timeout": "10"},
+        }
         if hasattr(types, "HttpRetryOptions"):
             http_kwargs["retry_options"] = types.HttpRetryOptions(attempts=1)
         return genai.Client(

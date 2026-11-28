@@ -14,6 +14,12 @@ import {
 } from '../types/procurement.ts';
 import { AlertIcon, CheckIcon } from '../../shared/icons.tsx';
 
+import {formatInr, ProcurementIcon, PurchaseDocument} from './PurchaseDocument.tsx';
+
+function receipt(p: PurchaseProposal) {
+  return [p.proposal_code, p.status, 'v' + p.version, p.approved_by || p.rejected_by || p.submitted_by, p.rejection_reason].filter(Boolean).join(' · ');
+}
+
 type TabKey =
   | 'dashboard'
   | 'shortages'
@@ -24,18 +30,15 @@ type TabKey =
   | 'briefings';
 
 const TABS: Array<{ key: TabKey; label: string }> = [
-  { key: 'dashboard', label: '1. Dashboard' },
-  { key: 'shortages', label: '2. Shortages' },
-  { key: 'proposals', label: '3. Proposals' },
-  { key: 'approvals', label: '4. Approval Center' },
-  { key: 'orders', label: '5. Purchase Orders' },
-  { key: 'emails', label: '6. Supplier Email' },
-  { key: 'briefings', label: '7. AI Briefings' },
+  { key: 'dashboard', label: 'Dashboard' },
+  { key: 'shortages', label: 'Shortages' },
+  { key: 'proposals', label: 'Proposals' },
+  { key: 'approvals', label: 'Approval Center' },
+  { key: 'orders', label: 'Purchase Orders' },
+  { key: 'emails', label: 'Supplier Email' },
+  { key: 'briefings', label: 'AI Briefings' },
 ];
 
-function formatInr(amount: number): string {
-  return '₹' + amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 function statusBadgeStyle(status: string): React.CSSProperties {
   if (status === 'CRITICAL' || status === 'REJECTED' || status === 'FAILED' || status === 'CANCELLED') {
@@ -48,7 +51,7 @@ function statusBadgeStyle(status: string): React.CSSProperties {
 }
 
 export const ProcurementPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
+  const [activeTab, setActiveTab] = useState<TabKey>('proposals');
   const [actorId, setActorId] = useState<string>('ananya.rao');
   const [actorRole, setActorRole] = useState<ProcurementRole>('PROCUREMENT_OFFICER');
 
@@ -96,12 +99,8 @@ export const ProcurementPage: React.FC = () => {
       setPurchaseOrders(pos);
       setEmailLogs(emails);
       setAuditLogs(audits);
-      if (props.length > 0 && selectedProposalId === null) {
-        setSelectedProposalId(props[0].id);
-      }
-      if (pos.length > 0 && selectedPoId === null) {
-        setSelectedPoId(pos[0].id);
-      }
+      setSelectedProposalId(id => id ?? props[0]?.id ?? null);
+      setSelectedPoId(id => id ?? pos[0]?.id ?? null);
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Failed to load procurement workspace.');
     } finally {
@@ -113,16 +112,19 @@ export const ProcurementPage: React.FC = () => {
     loadAll();
   }, [loadAll]);
 
-  const selectedProposal = proposals.find((p) => p.id === selectedProposalId) || proposals[0] || null;
+  const reviewList = activeTab === 'approvals' ? approvalQueue : proposals;
+  const p = reviewList.find(row => row.id === selectedProposalId) ?? reviewList[0];
+  const po = purchaseOrders.find(row => row.proposal_id === p?.id);
+  const canApprove = ['PROCUREMENT_OFFICER','ADMINISTRATOR'].includes(actorRole) && !['ai','ai_system','system','bot'].includes(actor.actorId.toLowerCase());
   const activePoId = selectedPoId ?? purchaseOrders[0]?.id ?? null;
 
-  async function runAction(label: string, fn: () => Promise<void>) {
+  async function runAction(label: string, fn: () => Promise<void | string>) {
     setErrorMsg(null);
     setSuccessMsg(null);
     setLoading(true);
     try {
-      await fn();
-      setSuccessMsg(label);
+      const result = await fn();
+      setSuccessMsg(result || label);
       await loadAll();
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Action failed.');
@@ -143,16 +145,18 @@ export const ProcurementPage: React.FC = () => {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div className="procurement">
+      <nav className="proc-rail" aria-label="Procurement destinations">{TABS.map(t => <button key={t.key} title={t.label} aria-label={t.label} aria-current={activeTab === t.key ? 'page' : undefined} onClick={() => setActiveTab(t.key)}><ProcurementIcon name={t.key}/><span>{t.label}</span></button>)}</nav>
+      <div className="proc-body">
       {/* Header & Actor Context Bar */}
       <section className="ruled-box" style={{ padding: '1.25rem 1.5rem', background: 'var(--surface)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--ink-muted)', textTransform: 'uppercase' }}>
-              BRANCH 3 · PROCUREMENT, HUMAN APPROVALS, PURCHASE ORDERS & ROLE BRIEFINGS
+              Procurement workspace
             </div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 700, textTransform: 'uppercase', marginTop: '0.2rem' }}>
-              Procurement & Operational Intelligence
+              {TABS.find(t => t.key === activeTab)?.label}
             </h1>
           </div>
 
@@ -161,7 +165,7 @@ export const ProcurementPage: React.FC = () => {
               <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--ink-muted)' }}>ACTOR ID</label>
               <input
                 type="text"
-                value={actorId}
+                aria-label="Actor ID" value={actorId}
                 onChange={(e) => setActorId(e.target.value)}
                 style={{ padding: '0.3rem 0.5rem', border: '1px solid var(--rule)', fontFamily: 'var(--font-mono)', fontSize: '0.8rem', width: '130px' }}
               />
@@ -169,7 +173,7 @@ export const ProcurementPage: React.FC = () => {
             <div>
               <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--ink-muted)' }}>ROLE</label>
               <select
-                value={actorRole}
+                aria-label="Actor role" value={actorRole}
                 onChange={(e) => setActorRole(e.target.value as ProcurementRole)}
                 style={{ padding: '0.3rem 0.5rem', border: '1px solid var(--rule)', fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}
               >
@@ -189,29 +193,6 @@ export const ProcurementPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Workspace Tab Navigation */}
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '1.1rem', borderTop: '1px solid var(--rule)', paddingTop: '0.85rem' }}>
-          {TABS.map((tab) => {
-            const active = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                style={{
-                  padding: '0.45rem 0.85rem',
-                  fontSize: '0.8rem',
-                  fontWeight: active ? 700 : 500,
-                  border: active ? '1px solid var(--oxide-red)' : '1px solid var(--rule)',
-                  background: active ? 'var(--oxide-red)' : 'var(--canvas)',
-                  color: active ? '#fff' : 'var(--ink)',
-                  cursor: 'pointer',
-                }}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
       </section>
 
       {errorMsg && (
@@ -338,6 +319,7 @@ export const ProcurementPage: React.FC = () => {
                                 const created = await procurementAdapter.generateProposal(actor, s.shortage_ref);
                                 setSelectedProposalId(created.id);
                                 setActiveTab('proposals');
+                                return receipt(created);
                               })
                             }
                             style={{ padding: '0.35rem 0.7rem', background: 'var(--ink)', color: '#fff', border: 'none', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}
@@ -356,183 +338,36 @@ export const ProcurementPage: React.FC = () => {
       )}
 
       {/* 3. PURCHASE PROPOSAL WORKSPACE */}
-      {activeTab === 'proposals' && (
-        <section style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 1fr) minmax(360px, 2fr)', gap: '1.25rem' }}>
-          <div className="ruled-box" style={{ padding: '1rem', background: 'var(--surface)' }}>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.75rem' }}>
-              Proposals ({proposals.length})
-            </h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {proposals.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedProposalId(p.id)}
-                  style={{
-                    textAlign: 'left',
-                    padding: '0.65rem',
-                    border: selectedProposal?.id === p.id ? '2px solid var(--oxide-red)' : '1px solid var(--rule)',
-                    background: 'var(--canvas)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>
-                    <strong>{p.proposal_code}</strong>
-                    <span>{p.status}</span>
-                  </div>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 600, marginTop: '0.2rem' }}>{p.sku_name}</div>
-                  <div className="tabular" style={{ fontSize: '0.76rem', color: 'var(--ink-secondary)' }}>
-                    {p.recommended_quantity} {p.unit} · {formatInr(p.estimated_total_price)}
-                  </div>
-                </button>
-              ))}
-              {proposals.length === 0 && <p style={{ fontSize: '0.84rem', color: 'var(--ink-muted)' }}>No proposals generated yet.</p>}
+      {(activeTab === 'proposals' || activeTab === 'approvals') && <section>
+        {reviewList.length > 0 ? <>
+          <label className="record-picker">{activeTab === 'approvals' ? 'Approval queue' : 'Proposal register'}
+            <select value={p?.id} onChange={e => setSelectedProposalId(Number(e.target.value))}>
+              {reviewList.map(row => <option key={row.id} value={row.id}>{row.proposal_code} · {row.status}</option>)}
+            </select>
+          </label>
+          {p && <PurchaseDocument p={p} po={po} email={emailLogs.filter(l => l.purchase_order_id === po?.id).sort((a,b) => b.id-a.id)[0]}>
+            <div className="decision"><small>Acting as</small><strong>{actor.actorId}</strong><p>{actorRole.replace(/_/g,' ').toLowerCase()}</p>
+              <small>Proposal status</small><b>{p.status.replace(/_/g,' ')}</b>
+              {p.status === 'DRAFT' && <button disabled={loading} onClick={() => runAction('Submitted', async () => {
+                const result = await procurementAdapter.submitProposal(actor,p.id,p.version);
+                setActiveTab('approvals'); return receipt(result);
+              })}>Submit for human approval</button>}
+              {p.status === 'PENDING_APPROVAL' && <>
+                <p>{canApprove ? 'May approve or reject this purchase proposal.' : 'Approval requires an authorized procurement officer or administrator.'}</p>
+                <button disabled={loading || !canApprove} onClick={() => runAction('Approved', async () => receipt(await procurementAdapter.approveProposal(actor,p.id,p.version,'Approved via Approval Center')))}>Approve proposal</button>
+                <details><summary>Reject with reason</summary><label>Reason<input value={rejectReasons[p.id] || ''} onChange={e => setRejectReasons({...rejectReasons,[p.id]:e.target.value})}/></label>
+                  <button disabled={loading || !canApprove || !rejectReasons[p.id]?.trim()} onClick={() => runAction('Rejected', async () => receipt(await procurementAdapter.rejectProposal(actor,p.id,p.version,rejectReasons[p.id])))}>Reject proposal</button>
+                </details>
+              </>}
+              {p.status === 'APPROVED' && !po && <button disabled={!canApprove || loading} onClick={() => runAction('Purchase order created',async () => {
+                const result = await procurementAdapter.createPurchaseOrder(actor,p.id);
+                setSelectedPoId(result.id); return result.po_number + ' · ' + result.approval_reference;
+              })}>Create purchase order</button>}
             </div>
-          </div>
-
-          <div className="ruled-box" style={{ padding: '1.25rem', background: 'var(--surface)' }}>
-            {!selectedProposal ? (
-              <p style={{ color: 'var(--ink-muted)' }}>Select or generate a purchase proposal to inspect details.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--rule)', paddingBottom: '0.75rem' }}>
-                  <div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--ink-muted)' }}>
-                      {selectedProposal.shortage_ref} · v{selectedProposal.version}
-                    </div>
-                    <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 700 }}>{selectedProposal.proposal_code}</h3>
-                  </div>
-                  <span style={{ ...statusBadgeStyle(selectedProposal.status), padding: '0.25rem 0.6rem', fontFamily: 'var(--font-mono)', fontSize: '0.78rem', fontWeight: 700 }}>
-                    {selectedProposal.status}
-                  </span>
-                </div>
-
-                {/* Verified Facts */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.65rem' }}>
-                  <div style={{ padding: '0.6rem', border: '1px solid var(--rule)', background: 'var(--surface-subtle)' }}>
-                    <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', color: 'var(--ink-muted)' }}>VERIFIED SHORTAGE</div>
-                    <div className="tabular" style={{ fontWeight: 700 }}>{selectedProposal.shortage_quantity} {selectedProposal.unit}</div>
-                  </div>
-                  <div style={{ padding: '0.6rem', border: '1px solid var(--rule)', background: 'var(--surface-subtle)' }}>
-                    <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', color: 'var(--ink-muted)' }}>RECOMMENDED QTY</div>
-                    <div className="tabular" style={{ fontWeight: 700 }}>{selectedProposal.recommended_quantity} {selectedProposal.unit}</div>
-                  </div>
-                  <div style={{ padding: '0.6rem', border: '1px solid var(--rule)', background: 'var(--surface-subtle)' }}>
-                    <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', color: 'var(--ink-muted)' }}>UNIT / TOTAL PRICE</div>
-                    <div className="tabular" style={{ fontWeight: 700 }}>{formatInr(selectedProposal.estimated_unit_price)} / {formatInr(selectedProposal.estimated_total_price)}</div>
-                  </div>
-                  <div style={{ padding: '0.6rem', border: '1px solid var(--rule)', background: 'var(--surface-subtle)' }}>
-                    <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', color: 'var(--ink-muted)' }}>PREFERRED SUPPLIER</div>
-                    <div style={{ fontWeight: 700 }}>{selectedProposal.preferred_supplier.name}</div>
-                  </div>
-                </div>
-
-                {/* AI Justification & Risk (Clearly marked as AI-generated) */}
-                <div style={{ padding: '0.85rem', border: '1px solid var(--rule)', background: 'var(--canvas)' }}>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--oxide-red)', fontWeight: 700, marginBottom: '0.35rem' }}>
-                    AI-GENERATED SUGGESTION ({selectedProposal.ai_execution_mode.toUpperCase()} · REQUIRES HUMAN APPROVAL)
-                  </div>
-                  <p style={{ fontSize: '0.88rem', marginBottom: '0.5rem' }}><strong>Justification:</strong> {selectedProposal.ai_justification}</p>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--ink-secondary)' }}><strong>Risk Assessment:</strong> {selectedProposal.risk_assessment}</p>
-                </div>
-
-                {/* Supporting Historical Cases (Branch 2) */}
-                {selectedProposal.historical_case_refs.length > 0 && (
-                  <div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--ink-muted)', marginBottom: '0.35rem' }}>
-                      SUPPORTING HISTORICAL CASES (BRANCH 2 SIMILARITY SEARCH)
-                    </div>
-                    <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: '0.82rem' }}>
-                      {selectedProposal.historical_case_refs.map((c) => (
-                        <li key={c.case_id}>
-                          <strong>{c.case_id}</strong> ({Math.round(c.similarity_score * 100)}% match): {c.title} — {c.outcome_summary}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {selectedProposal.status === 'DRAFT' && (
-                  <div>
-                    <button
-                      onClick={() =>
-                        runAction(`Submitted ${selectedProposal.proposal_code} for human approval`, async () => {
-                          await procurementAdapter.submitProposal(actor, selectedProposal.id, selectedProposal.version);
-                          setActiveTab('approvals');
-                        })
-                      }
-                      style={{ padding: '0.55rem 1rem', background: 'var(--oxide-red)', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer' }}
-                    >
-                      Submit for Human Approval
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* 4. APPROVAL CENTER */}
-      {activeTab === 'approvals' && (
-        <section className="ruled-box" style={{ padding: '1.25rem', background: 'var(--surface)' }}>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.35rem' }}>
-            Human Approval Center
-          </h2>
-          <p style={{ fontSize: '0.85rem', color: 'var(--ink-secondary)', marginBottom: '1rem' }}>
-            Only authorized human users (<code>PROCUREMENT_OFFICER</code> or <code>ADMINISTRATOR</code>) may approve or reject proposals. AI approval is blocked in the backend.
-          </p>
-          {approvalQueue.length === 0 ? (
-            <p style={{ color: 'var(--ink-muted)' }}>Approval queue is empty.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {approvalQueue.map((p) => (
-                <div key={p.id} style={{ padding: '1rem', border: '1px solid var(--rule)', background: 'var(--canvas)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <div>
-                      <strong style={{ fontFamily: 'var(--font-mono)' }}>{p.proposal_code}</strong> · {p.sku_name} ({p.recommended_quantity} {p.unit})
-                      <div style={{ fontSize: '0.82rem', color: 'var(--ink-secondary)' }}>
-                        Supplier: {p.preferred_supplier.name} · Total: <strong className="tabular">{formatInr(p.estimated_total_price)}</strong>
-                      </div>
-                    </div>
-                    <span style={{ ...statusBadgeStyle(p.urgency_level), padding: '0.2rem 0.5rem', fontFamily: 'var(--font-mono)', fontSize: '0.74rem' }}>
-                      {p.urgency_level}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.85rem' }}>
-                    <button
-                      onClick={() =>
-                        runAction(`Approved ${p.proposal_code}`, async () => {
-                          await procurementAdapter.approveProposal(actor, p.id, p.version, 'Approved via Approval Center');
-                        })
-                      }
-                      style={{ padding: '0.45rem 0.9rem', background: 'var(--forest-green)', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer' }}
-                    >
-                      Approve Proposal
-                    </button>
-                    <input
-                      type="text"
-                      placeholder="Mandatory rejection reason..."
-                      value={rejectReasons[p.id] || ''}
-                      onChange={(e) => setRejectReasons((prev) => ({ ...prev, [p.id]: e.target.value }))}
-                      style={{ padding: '0.42rem 0.6rem', border: '1px solid var(--rule)', minWidth: '240px', fontSize: '0.84rem' }}
-                    />
-                    <button
-                      onClick={() =>
-                        runAction(`Rejected ${p.proposal_code}`, async () => {
-                          await procurementAdapter.rejectProposal(actor, p.id, p.version, rejectReasons[p.id] || '');
-                        })
-                      }
-                      style={{ padding: '0.45rem 0.9rem', background: 'var(--oxide-red)', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer' }}
-                    >
-                      Reject
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
+            <div className="email-next"><small>Supplier email</small>{po ? <button className="btn-secondary" onClick={() => {setSelectedPoId(po.id);setEmailPreview(null);setHumanEmailConfirmed(false);setActiveTab('emails');}}>Open email workflow</button> : <p>Available after purchase order creation. Sending requires separate confirmation.</p>}</div>
+          </PurchaseDocument>}
+        </> : <p>{activeTab === 'approvals' ? 'Approval queue is empty.' : 'Generate a proposal from a shortage to start review.'}</p>}
+      </section>}
 
       {/* 5. PURCHASE ORDERS */}
       {activeTab === 'orders' && (
@@ -545,11 +380,12 @@ export const ProcurementPage: React.FC = () => {
                   .filter((p) => p.status === 'APPROVED')
                   .map((p) => (
                     <button
-                      key={p.id}
+                      key={p.id} disabled={!canApprove || loading}
                       onClick={() =>
                         runAction(`Created Purchase Order for ${p.proposal_code}`, async () => {
                           const po = await procurementAdapter.createPurchaseOrder(actor, p.id);
                           setSelectedPoId(po.id);
+                          return po.po_number + ' · ' + po.approval_reference;
                         })
                       }
                       style={{ padding: '0.45rem 0.85rem', background: 'var(--forest-green)', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer' }}
@@ -597,10 +433,11 @@ export const ProcurementPage: React.FC = () => {
                         </td>
                         <td style={{ padding: '0.5rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                           {po.status === 'CREATED' && (
-                            <button
+                            <button disabled={!canApprove || loading}
                               onClick={() =>
                                 runAction(`Marked ${po.po_number} READY_TO_SEND`, async () => {
-                                  await procurementAdapter.updatePurchaseOrderStatus(actor, po.id, 'READY_TO_SEND' as PurchaseOrderStatus, po.version);
+                                  const result = await procurementAdapter.updatePurchaseOrderStatus(actor, po.id, 'READY_TO_SEND' as PurchaseOrderStatus, po.version);
+                                  return result.po_number + ' · ' + result.status;
                                 })
                               }
                               style={{ padding: '0.3rem 0.55rem', border: '1px solid var(--rule)', background: 'var(--canvas)', fontSize: '0.76rem', cursor: 'pointer' }}
@@ -661,7 +498,7 @@ export const ProcurementPage: React.FC = () => {
                     type="text"
                     placeholder="Optional supplier instruction note..."
                     value={emailCustomNote}
-                    onChange={(e) => setEmailCustomNote(e.target.value)}
+                    onChange={(e) => {setEmailCustomNote(e.target.value);setEmailPreview(null);setHumanEmailConfirmed(false);}}
                     style={{ padding: '0.45rem 0.65rem', border: '1px solid var(--rule)', minWidth: '240px', fontSize: '0.84rem' }}
                   />
                   <button
@@ -670,6 +507,7 @@ export const ProcurementPage: React.FC = () => {
                       runAction('Generated supplier email preview', async () => {
                         const prev = await procurementAdapter.previewSupplierEmail(actor, activePoId, emailCustomNote);
                         setEmailPreview(prev);
+                        setHumanEmailConfirmed(false);
                       })
                     }
                     style={{ padding: '0.45rem 0.9rem', background: 'var(--ink)', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer' }}
@@ -722,11 +560,12 @@ export const ProcurementPage: React.FC = () => {
                         I confirm this Purchase Order email is accurate and ready to send
                       </label>
                       <button
-                        disabled={!humanEmailConfirmed}
+                        disabled={!humanEmailConfirmed || !canApprove || loading || emailPreview.purchase_order_id !== activePoId}
                         onClick={() =>
                           activePoId &&
                           runAction('Recorded confirmed email dispatch attempt', async () => {
-                            await procurementAdapter.sendSupplierEmail(actor, activePoId, humanEmailConfirmed, emailCustomNote);
+                            const result = await procurementAdapter.sendSupplierEmail(actor, activePoId, humanEmailConfirmed, emailCustomNote);
+                            return [result.delivery_status,result.provider_message_id || result.error_message].filter(Boolean).join(' · ');
                           })
                         }
                         style={{
@@ -862,6 +701,7 @@ export const ProcurementPage: React.FC = () => {
           )}
         </section>
       )}
+      </div>
     </div>
   );
 };
